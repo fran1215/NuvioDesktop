@@ -14,8 +14,8 @@ interface CacheEntry {
 }
 
 export class TrailerService {
-  // YouTube CDN URLs expire ~6h; cache for 5h
-  private static readonly CACHE_TTL_MS = 5 * 60 * 60 * 1000;
+  // Cache for 3 minutes — just enough to avoid re-extracting on quick re-renders
+  private static readonly CACHE_TTL_MS = 3 * 60 * 1000;
   private static urlCache = new Map<string, CacheEntry>();
 
   // ---------------------------------------------------------------------------
@@ -136,6 +136,22 @@ export class TrailerService {
     if (Date.now() > entry.expiresAt) {
       this.urlCache.delete(key);
       return null;
+    }
+    // Check the URL's own CDN expiry — googlevideo.com URLs carry an `expire`
+    // param (Unix timestamp). Treat as stale if it expires within 2 minutes.
+    if (entry.url.includes('googlevideo.com')) {
+      try {
+        const u = new URL(entry.url);
+        const expire = u.searchParams.get('expire');
+        if (expire) {
+          const expiresAt = parseInt(expire, 10) * 1000;
+          if (Date.now() > expiresAt - 2 * 60 * 1000) {
+            logger.info('TrailerService', `Cached URL expired or expiring soon — re-extracting`);
+            this.urlCache.delete(key);
+            return null;
+          }
+        }
+      } catch { /* ignore */ }
     }
     return entry.url;
   }
