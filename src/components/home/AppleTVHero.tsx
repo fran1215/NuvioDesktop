@@ -460,7 +460,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         // Fetch video list from TMDB to get the YouTube video ID
         const tmdbApiKey = await TMDBService.getInstance().getApiKey();
         const videosRes = await fetch(
-          `https://api.themoviedb.org/3/${contentType}/${tmdbId}/videos?api_key=${tmdbApiKey}&language=en-US`
+          `https://api.themoviedb.org/3/${contentType}/${tmdbId}/videos?api_key=${tmdbApiKey}`
         );
 
         if (!alive) return;
