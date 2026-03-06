@@ -159,28 +159,18 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
   const handleVideoError = useCallback((error: any) => {
     logger.error('TrailerModal', 'Video error:', error);
 
-    const errorCode = error?.error?.code;
-    const isRetryableError = errorCode === -1102 || errorCode === -1009 || errorCode === -1005;
-
-    if (isRetryableError && retryCount < 2) {
-      logger.info('TrailerModal', `Retrying video load (attempt ${retryCount + 1}/2)`);
+    if (retryCount < 2) {
+      logger.info('TrailerModal', `Re-extracting trailer (attempt ${retryCount + 1}/2)`);
       setRetryCount(prev => prev + 1);
-
-      // Capture current URL before clearing it
-      setTrailerUrl(current => {
-        const urlToRestore = current;
-        setTimeout(() => {
-          setTrailerUrl(urlToRestore);
-        }, 500);
-        return null; // Clear first to force remount
-      });
+      // Re-run full extraction — don't reload the same bad URL
+      loadTrailer();
       return;
     }
 
-    logger.error('TrailerModal', 'Video error after retries or non-retryable:', error);
+    logger.error('TrailerModal', 'Video error after retries:', error);
     setError('Unable to play trailer. Please try again.');
     setLoading(false);
-  }, [retryCount]);
+  }, [retryCount, loadTrailer]);
 
   const handleTrailerEnd = useCallback(() => {
     setIsPlaying(false);
