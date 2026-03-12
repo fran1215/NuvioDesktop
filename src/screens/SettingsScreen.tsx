@@ -11,7 +11,6 @@ import {
   StatusBar,
   Platform,
   Dimensions,
-  Linking,
   FlatList,
   Image,
 } from 'react-native';
@@ -362,6 +361,9 @@ const SettingsScreen: React.FC = () => {
     if (item && item.visible === false) return false;
     return true;
   };
+  const showTraktItem = isItemVisible('trakt');
+  const showSimklItem = isItemVisible('simkl');
+  const showCloudSyncItem = isItemVisible('cloud_sync');
 
   // Filter categories based on conditions
   const visibleCategories = SETTINGS_CATEGORIES.filter(category => {
@@ -377,18 +379,35 @@ const SettingsScreen: React.FC = () => {
       case 'account':
         return (
           <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
-            {isItemVisible('trakt') && (
+            {showCloudSyncItem && (
+              <SettingItem
+                title={t('settings.cloud_sync.title')}
+                description={t('settings.cloud_sync.description')}
+                customIcon={
+                  <FastImage
+                    source={require('../../assets/nuvio-sync-icon-og.png')}
+                    style={[styles.syncLogoIcon, isTablet ? styles.syncLogoIconTablet : null]}
+                    resizeMode={FastImage.resizeMode.contain}
+                  />
+                }
+                renderControl={() => <ChevronRight />}
+                onPress={() => (navigation as any).navigate('SyncSettings')}
+                isLast={!showTraktItem && !showSimklItem && !isItemVisible('mal')}
+                isTablet={isTablet}
+              />
+            )}
+            {showTraktItem && (
               <SettingItem
                 title={t('trakt.title')}
                 description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
-                isLast={!isItemVisible('simkl') && !isItemVisible('mal')}
+                isLast={!showSimklItem && !isItemVisible('mal')}
                 isTablet={isTablet}
               />
             )}
-            {isItemVisible('simkl') && (
+            {showSimklItem && (
               <SettingItem
                 title={t('settings.items.simkl')}
                 description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
@@ -536,7 +555,7 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title={t('settings.backup_restore').toUpperCase()} isTablet={isTablet}>
             <SettingItem
               title={t('settings.backup_restore')}
-              description="Create and restore app backups"
+              description={t('settings.backup_restore_desc')}
               icon="archive"
               renderControl={() => <ChevronRight />}
               onPress={() => navigation.navigate('Backup')}
@@ -694,19 +713,35 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Account */}
-            {(settingsConfig?.categories?.['account']?.visible !== false) && (isItemVisible('trakt') || isItemVisible('simkl') || isItemVisible('mal')) && (
+            {(settingsConfig?.categories?.['account']?.visible !== false) && (showTraktItem || showSimklItem || showCloudSyncItem || isItemVisible('mal')) && (
               <SettingsCard title={t('settings.account').toUpperCase()}>
-                {isItemVisible('trakt') && (
+                {showCloudSyncItem && (
+                  <SettingItem
+                    title="Nuvio Sync"
+                    description="Sync data across your Nuvio devices"
+                    customIcon={
+                      <FastImage
+                        source={require('../../assets/nuvio-sync-icon-og.png')}
+                        style={styles.syncLogoIcon}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
+                    }
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => (navigation as any).navigate('SyncSettings')}
+                    isLast={!showTraktItem && !showSimklItem && !isItemVisible('mal')}
+                  />
+                )}
+                {showTraktItem && (
                   <SettingItem
                     title={t('trakt.title')}
                     description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                     customIcon={<TraktIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
-                    isLast={!isItemVisible('simkl') && !isItemVisible('mal')}
+                    isLast={!showSimklItem && !isItemVisible('mal')}
                   />
                 )}
-                {isItemVisible('simkl') && (
+                {showSimklItem && (
                   <SettingItem
                     title={t('settings.items.simkl')}
                     description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
@@ -900,41 +935,6 @@ const SettingsScreen: React.FC = () => {
                 />
               </TouchableOpacity>
 
-              <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <TouchableOpacity
-                  style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
-                  onPress={() => Linking.openURL('https://discord.gg/KVgDTjhA4H')}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.discordButtonContent}>
-                    <FastImage
-                      source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
-                      style={styles.discordLogo}
-                      resizeMode={FastImage.resizeMode.contain}
-                    />
-                    <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                      Discord
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.discordButton, { backgroundColor: '#FF4500' + '15' }]}
-                  onPress={() => Linking.openURL('https://www.reddit.com/r/Nuvio/')}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.discordButtonContent}>
-                    <FastImage
-                      source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
-                      style={styles.discordLogo}
-                      resizeMode={FastImage.resizeMode.contain}
-                    />
-                    <Text style={[styles.discordButtonText, { color: '#FF4500' }]}>
-                      Reddit
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
             </View>
 
             {/* Monkey Animation */}
@@ -950,7 +950,7 @@ const SettingsScreen: React.FC = () => {
 
             <View style={styles.brandLogoContainer}>
               <FastImage
-                source={require('../../assets/nuviotext.png')}
+                source={require('../../assets/text_only_og.png')}
                 style={styles.brandLogo}
                 resizeMode={FastImage.resizeMode.contain}
               />
@@ -1175,19 +1175,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     maxWidth: 200,
   },
-  discordButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  discordLogo: {
-    width: 18,
-    height: 18,
-    marginRight: 10,
-  },
-  discordButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   kofiImage: {
     height: 34,
     width: 155,
@@ -1219,6 +1206,14 @@ const styles = StyleSheet.create({
   monkeyAnimation: {
     width: 180,
     height: 180,
+  },
+  syncLogoIcon: {
+    width: 20,
+    height: 20,
+  },
+  syncLogoIconTablet: {
+    width: 24,
+    height: 24,
   },
   brandLogoContainer: {
     alignItems: 'center',

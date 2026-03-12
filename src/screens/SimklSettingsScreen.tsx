@@ -27,7 +27,6 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Simkl configuration
 const SIMKL_CLIENT_ID = process.env.EXPO_PUBLIC_SIMKL_CLIENT_ID as string;
-const SIMKL_REDIRECT_URI = process.env.EXPO_PUBLIC_SIMKL_REDIRECT_URI || 'nuvio://auth/simkl';
 
 const discovery = {
     authorizationEndpoint: 'https://simkl.com/oauth/authorize',
@@ -76,9 +75,10 @@ const SimklSettingsScreen: React.FC = () => {
         {
             clientId: SIMKL_CLIENT_ID,
             scopes: [], // Simkl doesn't strictly use scopes for basic access
-            redirectUri: SIMKL_REDIRECT_URI, // Must match what is set in Simkl Dashboard
+            redirectUri: redirectUri,
             responseType: ResponseType.Code,
-            // codeChallengeMethod: CodeChallengeMethod.S256, // Simkl might not verify PKCE, but standard compliant
+            usePKCE: true,
+            codeChallengeMethod: CodeChallengeMethod.S256,
         },
         discovery
     );
@@ -90,12 +90,12 @@ const SimklSettingsScreen: React.FC = () => {
     // Handle the response from the auth request
     useEffect(() => {
         if (response) {
-            if (response.type === 'success') {
+            if (response.type === 'success' && request?.codeVerifier) {
                 const { code } = response.params;
                 setIsExchangingCode(true);
                 logger.log('[SimklSettingsScreen] Auth code received, exchanging...');
 
-                simklService.exchangeCodeForToken(code)
+                simklService.exchangeCodeForToken(code, request.codeVerifier)
                     .then(success => {
                         if (success) {
                             refreshAuthStatus();
@@ -109,11 +109,14 @@ const SimklSettingsScreen: React.FC = () => {
                         openAlert(t('common.error'), t('simkl.auth_error_generic'));
                     })
                     .finally(() => setIsExchangingCode(false));
+            } else if (response.type === 'success') {
+                logger.error('[SimklSettingsScreen] Missing PKCE code verifier on successful auth response');
+                openAlert(t('common.error'), t('simkl.auth_error_msg'));
             } else if (response.type === 'error') {
                 openAlert(t('simkl.auth_error_title'), t('simkl.auth_error_generic') + ' ' + (response.error?.message || t('common.unknown')));
             }
         }
-    }, [response, refreshAuthStatus]);
+    }, [response, refreshAuthStatus, request?.codeVerifier, t]);
 
     const handleSignIn = () => {
         if (!SIMKL_CLIENT_ID) {

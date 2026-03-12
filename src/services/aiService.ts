@@ -126,10 +126,18 @@ interface OpenRouterResponse {
   };
 }
 
+interface OpenRouterErrorResponse {
+  error?: {
+    message?: string;
+    code?: string;
+  };
+}
+
 class AIService {
   private static instance: AIService;
   private apiKey: string | null = null;
   private baseUrl = 'https://openrouter.ai/api/v1';
+  private defaultModel = 'openrouter/free';
 
   private constructor() { }
 
@@ -151,10 +159,39 @@ class AIService {
   }
 
   async isConfigured(): Promise<boolean> {
-    if (!this.apiKey) {
-      await this.initialize();
-    }
+    // Always refresh from storage so key changes in settings are picked up immediately.
+    await this.initialize();
     return !!this.apiKey;
+  }
+
+  private async getPreferredModels(): Promise<string[]> {
+    const configuredModel = (await mmkvStorage.getItem('openrouter_model'))?.trim();
+    if (!configuredModel) {
+      return [this.defaultModel];
+    }
+    return [configuredModel];
+  }
+
+  private async parseErrorResponse(response: Response): Promise<{
+    statusLine: string;
+    message: string;
+    raw: string;
+  }> {
+    const raw = await response.text();
+    let message = '';
+
+    try {
+      const parsed = JSON.parse(raw) as OpenRouterErrorResponse;
+      message = parsed.error?.message || '';
+    } catch {
+      message = raw;
+    }
+
+    return {
+      statusLine: `${response.status} ${response.statusText}`,
+      message: (message || '').trim(),
+      raw,
+    };
   }
 
   private createSystemPrompt(context: ContentContext): string {
@@ -349,6 +386,9 @@ Answer questions about this movie using only the verified database information a
         });
       }
 
+      const model = (await this.getPreferredModels())[0];
+      if (__DEV__) console.log('[AIService] Using model:', model);
+
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -358,7 +398,7 @@ Answer questions about this movie using only the verified database information a
           'X-Title': 'Nuvio - AI Chat',
         },
         body: JSON.stringify({
-          model: 'xiaomi/mimo-v2-flash:free',
+          model,
           messages,
           max_tokens: 1000,
           temperature: 0.7,
@@ -369,9 +409,17 @@ Answer questions about this movie using only the verified database information a
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        if (__DEV__) console.error('[AIService] API Error:', response.status, errorText);
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        const parsedError = await this.parseErrorResponse(response);
+
+        if (__DEV__) {
+          console.error('[AIService] API Error:', {
+            model,
+            status: parsedError.statusLine,
+            message: parsedError.message || parsedError.raw,
+          });
+        }
+
+        throw new Error(`API request failed: ${parsedError.statusLine} - ${parsedError.message || parsedError.raw || 'Request failed'}`);
       }
 
       const data: OpenRouterResponse = await response.json();

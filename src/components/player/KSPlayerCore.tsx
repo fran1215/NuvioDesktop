@@ -36,7 +36,8 @@ import {
   usePlayerControls,
   usePlayerSetup,
   useWatchProgress,
-  useNextEpisode
+  useNextEpisode,
+  useSkipSegments
 } from './hooks';
 
 // Platform-specific hooks
@@ -47,6 +48,7 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useMetadata } from '../../hooks/useMetadata';
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 import stremioService from '../../services/stremioService';
+import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 
 // Utils
@@ -212,6 +214,16 @@ const KSPlayerCore: React.FC = () => {
     episodeId
   });
 
+  const { segments: skipIntervals, outroSegment } = useSkipSegments({
+    imdbId: imdbId || (id?.startsWith('tt') ? id : undefined),
+    type,
+    season,
+    episode,
+    malId: (metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id,
+    kitsuId: id?.startsWith('kitsu:') ? id.split(':')[1] : undefined,
+    enabled: settings.skipIntroEnabled
+  });
+
   const controls = usePlayerControls({
     playerRef: ksPlayerRef,
     paused,
@@ -219,7 +231,15 @@ const KSPlayerCore: React.FC = () => {
     currentTime,
     duration,
     isSeeking,
-    isMounted
+    isMounted,
+    onSeekComplete: (timeInSeconds) => {
+      if (!id || !type || duration <= 0) return;
+      void storageService.setWatchProgress(id, type, {
+        currentTime: timeInSeconds,
+        duration,
+        lastUpdated: Date.now()
+      }, episodeId);
+    }
   });
 
   const currentMalId = (metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id;
@@ -1021,6 +1041,7 @@ const KSPlayerCore: React.FC = () => {
         malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
         kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
         releaseDate={releaseDate}
+        skipIntervals={skipIntervals}
         currentTime={currentTime}
         onSkip={(endTime) => controls.seekToTime(endTime)}
         controlsVisible={showControls}
@@ -1048,6 +1069,7 @@ const KSPlayerCore: React.FC = () => {
         metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
         controlsVisible={showControls}
         controlsFixedOffset={126}
+        outroSegment={outroSegment}
       />
 
       {/* Modals */}

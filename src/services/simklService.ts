@@ -301,7 +301,7 @@ export class SimklService {
      * Exchange code for access token
      * Simkl tokens do not expire
      */
-    public async exchangeCodeForToken(code: string): Promise<boolean> {
+    public async exchangeCodeForToken(code: string, codeVerifier: string): Promise<boolean> {
         await this.ensureInitialized();
 
         try {
@@ -315,7 +315,8 @@ export class SimklService {
                     client_id: SIMKL_CLIENT_ID,
                     client_secret: SIMKL_CLIENT_SECRET,
                     redirect_uri: SIMKL_REDIRECT_URI,
-                    grant_type: 'authorization_code'
+                    grant_type: 'authorization_code',
+                    code_verifier: codeVerifier
                 })
             });
 

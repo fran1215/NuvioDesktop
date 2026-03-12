@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Dimensions } from 'react-native';
 import { MaterialIcons as MaterialIconsWrapper } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
+import FastImage from '@d11/react-native-fast-image';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
 import { mmkvStorage } from '../../services/mmkvStorage';
 import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../screens/MDBListSettingsScreen';
@@ -265,10 +266,14 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
           return (
             <View key={source} style={[styles.compactRatingItem, { marginRight: itemSpacing }]}>
               {config.isImage ? (
-                <Image
+                <FastImage
                   source={config.icon as any}
-                  style={[styles.compactRatingIcon, { width: source === 'imdb' ? iconSize * 2 : iconSize, height: iconSize, marginRight: iconTextGap }]}
-                  resizeMode="contain"
+                  style={[styles.compactRatingIcon, { 
+                    width: source === 'imdb' ? iconSize * 2 : iconSize, 
+                    height: iconSize, 
+                    marginRight: iconTextGap 
+                  }]}
+                  resizeMode={FastImage.resizeMode.contain}
                 />
               ) : config.icon ? (
                 <View style={[styles.compactSvgContainer, { marginRight: iconTextGap }]}>

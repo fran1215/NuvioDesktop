@@ -74,6 +74,8 @@ import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
+const MAX_CONCURRENT_CATALOG_REQUESTS = 4;
+const HOME_LOADING_SCREEN_TIMEOUT_MS = 5000;
 
 // In-memory cache for catalog settings to avoid repeated MMKV reads
 let cachedCatalogSettings: Record<string, boolean> | null = null;
@@ -134,6 +136,7 @@ const HomeScreen = () => {
   const [loadedCatalogCount, setLoadedCatalogCount] = useState(0);
   const [hasAddons, setHasAddons] = useState<boolean | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
+  const [loadingScreenTimedOut, setLoadingScreenTimedOut] = useState(false);
   const totalCatalogsRef = useRef(0);
   const [visibleCatalogCount, setVisibleCatalogCount] = useState(5); // Reduced for memory
   const insets = useSafeAreaInsets();
@@ -185,6 +188,7 @@ const HomeScreen = () => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
+    setLoadingScreenTimedOut(false);
     setCatalogsLoading(true);
     setCatalogs([]);
     setLoadedCatalogCount(0);
@@ -210,6 +214,7 @@ const HomeScreen = () => {
         catalogService.getAllAddons(),
         stremioService.getInstalledAddonsAsync()
       ]);
+      const manifestByAddonId = new Map(addonManifests.map((manifest: any) => [manifest.id, manifest]));
 
       // Set hasAddons state based on whether we have any addons - ensure on main thread
       InteractionManager.runAfterInteractions(() => {
@@ -220,14 +225,20 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
 
-      // Launch all catalog loaders in parallel
-      const launchAllCatalogs = () => {
-        while (catalogQueue.length > 0) {
-          const catalogLoader = catalogQueue.shift();
-          if (catalogLoader) {
-            catalogLoader();
+      // Launch loaders with bounded concurrency to reduce startup pressure
+      const launchCatalogLoaders = () => {
+        const workerCount = Math.min(MAX_CONCURRENT_CATALOG_REQUESTS, catalogQueue.length);
+        const workers = Array.from({ length: workerCount }, async () => {
+          while (catalogQueue.length > 0) {
+            const catalogLoader = catalogQueue.shift();
+            if (!catalogLoader) return;
+            await catalogLoader();
           }
-        }
+        });
+
+        void Promise.all(workers).catch((error) => {
+          if (__DEV__) console.warn('[HomeScreen] Catalog loader worker failed:', error);
+        });
       };
 
       for (const addon of addons) {
@@ -243,7 +254,7 @@ const HomeScreen = () => {
 
               const catalogLoader = async () => {
                 try {
-                  const manifest = addonManifests.find((a: any) => a.id === addon.id);
+                  const manifest = manifestByAddonId.get(addon.id);
                   if (!manifest) return;
 
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
@@ -345,8 +356,8 @@ const HomeScreen = () => {
         setCatalogs(new Array(catalogIndex).fill(null));
       });
 
-      // Start all catalog requests in parallel
-      launchAllCatalogs();
+      // Start catalog requests with bounded concurrency
+      launchCatalogLoaders();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
       InteractionManager.runAfterInteractions(() => {
@@ -356,14 +367,29 @@ const HomeScreen = () => {
     }
   }, []);
 
+  // Hard cap for initial home loading spinner.
+  // Keeps Home responsive even if one or more catalog addons are slow.
+  useEffect(() => {
+    if (!(catalogsLoading && loadedCatalogCount === 0)) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setLoadingScreenTimedOut(true);
+    }, HOME_LOADING_SCREEN_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [catalogsLoading, loadedCatalogCount]);
+
   // Only count feature section as loading if it's enabled in settings
   // For catalogs, we show them progressively, so loading should be false as soon as we have any content
   const isLoading = useMemo(() => {
+    if (loadingScreenTimedOut) return false;
     // Exit loading as soon as at least one catalog is ready, regardless of featured
     if (loadedCatalogCount > 0) return false;
     const heroLoading = showHeroSection ? featuredLoading : false;
     return heroLoading && (catalogsLoading && loadedCatalogCount === 0);
-  }, [showHeroSection, featuredLoading, catalogsLoading, loadedCatalogCount]);
+  }, [loadingScreenTimedOut, showHeroSection, featuredLoading, catalogsLoading, loadedCatalogCount]);
 
   // Update global loading state
   useEffect(() => {
@@ -1482,4 +1508,3 @@ const HomeScreenWithFocusSync = (props: any) => {
 };
 
 export default React.memo(HomeScreenWithFocusSync);
-

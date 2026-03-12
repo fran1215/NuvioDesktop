@@ -11,10 +11,10 @@
   "apps": [
     {
       "name": "Nuvio",
-      "bundleIdentifier": "com.nuvio.app",
+      "bundleIdentifier": "com.nuvio.hub",
       "developerName": "Tapframe",
-      "subtitle": "Streaming app for movies and TV shows",
-      "localizedDescription": "Nuvio is a comprehensive streaming application that provides access to a vast library of movies and TV shows.",
+      "subtitle": "Media player and discovery app",
+      "localizedDescription": "Nuvio is a media player and metadata discovery application for user-provided and user-installed sources.",
       "iconURL": "https://github.com/tapframe/NuvioStreaming/blob/main/assets/android/playstore-icon.png?raw=true",
       "tintColor": "#04dcfc",
       "category": "entertainment",
@@ -30,6 +30,14 @@
         "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/search-portrait.png?raw=true"
       ],
       "versions": [
+        {
+          "version": "1.4.1",
+          "buildVersion": "37",
+          "date": "2026-02-27",
+          "localizedDescription": "## Release Notes\n\n### Audio & Subtitle Track Info — @chrisk325\n- Added audio codec, channel count, and estimated bitrate info to the track selector\n- Improved parsing of audio/subtitle track metadata from the player\n- Fixed edge cases with DTS track info, AC3 codecs, and 6.1 channel tracks\n- Fixed handling when player does not return language info\n- Removed hardcoded track info in favor of dynamic parsing\n\n### Player & Streaming Fixes — @chrisk325\n- Fixed Kitsu ID duplication that prevented streams from being fetched via Kitsu IDs\n- Fixed a crash in the player\n\n### Performance — @chrisk325\n- Improved app launch time by reducing OTA update checks at startup\n\n### Addon Configuration\n- Removed hardcoded addon config URL guesses\n\n### UI & Image Improvements — @chrisk325\n- Switched to FastImage for the IMDb logo\n\n### Asset & Logo Updates — @milicevicivan\n- Updated TMDB logo to higher quality (SVG to PNG)\n- Updated Simkl favicon and logo to higher quality versions\n- Added Trakt favicon\n\n### Internationalization (i18n) — @saimuelbr, @milicevicivan, @albyalex96, @IberianSoldierPC\n- Added i18n support for the Nuvio Sync screen — @saimuelbr\n- Updated Italian localization — @albyalex96\n- Improved Spanish translation — @IberianSoldierPC\n- Updated translations for 23 languages (AR, BG, ZH-CN, CS, DE, ES, FIL, FR, HE, HI, IT, MK, NL, PL, PT-BR, PT-PT, RO, RU, SL, SQ, SR, TR) — @milicevicivan\n\n### Contributors\n- **@chrisk325** — Audio/subtitle track info, player fixes, performance\n- **@milicevicivan** — Asset updates, translations\n- **@saimuelbr** — i18n sync screen\n- **@albyalex96** — Italian localization\n- **@IberianSoldierPC** — Spanish translation",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.4.1/Stable_1-4-1.ipa",
+          "size": 25700000
+        },
         {
           "version": "1.3.6",
           "buildVersion": "34",

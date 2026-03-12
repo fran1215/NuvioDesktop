@@ -1155,7 +1155,8 @@ const TMDBSettingsScreen = () => {
                           { code: 'fr', label: 'Français', native: 'French' },
                           { code: 'de', label: 'Deutsch', native: 'German' },
                           { code: 'it', label: 'Italiano', native: 'Italian' },
-                          { code: 'pt', label: 'Português', native: 'Portuguese' },
+                          { code: 'pt-BR', label: 'Português (Brasil)', native: 'Português (Brasil)' },
+                          { code: 'pt', label: 'Português (Portugal)', native: 'Português' },     
                           { code: 'ru', label: 'Русский', native: 'Russian' },
                           { code: 'tr', label: 'Türkçe', native: 'Turkish' },
                           { code: 'ja', label: '日本語', native: 'Japanese' },
@@ -1175,8 +1176,14 @@ const TMDBSettingsScreen = () => {
                           { code: 'uk', label: 'Українська', native: 'Ukrainian' },
                           { code: 'vi', label: 'Tiếng Việt', native: 'Vietnamese' },
                           { code: 'th', label: 'ไทย', native: 'Thai' },
-                          { code: 'hr', 
-label: 'Hrvatski', native: 'Croatian' },
+                          { code: 'hr', label: 'Hrvatski', native: 'Croatian' },
+                          { code: 'sr', label: 'Српски', native: 'Serbian' }, 
+                          { code: 'bg', label: 'български', native: 'Bulgarian' }, 
+                          { code: 'sl', label: 'Slovenščina', native: 'Slovenian' },
+                          { code: 'mk', label: 'Македонски', native: 'Macedonian' },
+                          { code: 'fil', label: 'Filipino', native: 'Filipino' },
+                          { code: 'sq', label: 'Shqipe', native: 'Albanian' },
+                          { code: 'ca', label: 'Català', native: 'Catalan' },
                         ];
 
                         const filteredLanguages = languages.filter(({ label, code, native }) =>

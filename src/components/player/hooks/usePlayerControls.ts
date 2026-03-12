@@ -17,6 +17,7 @@ interface PlayerControlsConfig {
     duration: number;
     isSeeking: MutableRefObject<boolean>;
     isMounted: MutableRefObject<boolean>;
+    onSeekComplete?: (timeInSeconds: number) => void;
 }
 
 export const usePlayerControls = (config: PlayerControlsConfig) => {
@@ -27,7 +28,8 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
         currentTime,
         duration,
         isSeeking,
-        isMounted
+        isMounted,
+        onSeekComplete
     } = config;
 
     // iOS seeking helpers
@@ -54,6 +56,7 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
 
             // Actually perform the seek
             playerRef.current.seek(timeInSeconds);
+            onSeekComplete?.(timeInSeconds);
 
             // Debounce the seeking state reset
             seekTimeoutRef.current = setTimeout(() => {
@@ -62,7 +65,7 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
                 }
             }, 500);
         }
-    }, [duration, paused, playerRef, isSeeking, isMounted]);
+    }, [duration, paused, playerRef, isSeeking, isMounted, onSeekComplete]);
 
     const skip = useCallback((seconds: number) => {
         seekToTime(currentTime + seconds);

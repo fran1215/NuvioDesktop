@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
+const DEFAULT_OPENROUTER_MODEL = 'openrouter/free';
 
 const AISettingsScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -75,6 +76,8 @@ const AISettingsScreen: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [isKeySet, setIsKeySet] = useState(false);
+  const [useDefaultModel, setUseDefaultModel] = useState(true);
+  const [customModel, setCustomModel] = useState('');
 
   useEffect(() => {
     loadApiKey();
@@ -82,10 +85,20 @@ const AISettingsScreen: React.FC = () => {
 
   const loadApiKey = async () => {
     try {
-      const savedKey = await mmkvStorage.getItem('openrouter_api_key');
+      const [savedKey, savedModel] = await Promise.all([
+        mmkvStorage.getItem('openrouter_api_key'),
+        mmkvStorage.getItem('openrouter_model'),
+      ]);
       if (savedKey) {
         setApiKey(savedKey);
         setIsKeySet(true);
+      }
+      if (savedModel && savedModel.trim()) {
+        setUseDefaultModel(false);
+        setCustomModel(savedModel.trim());
+      } else {
+        setUseDefaultModel(true);
+        setCustomModel('');
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading OpenRouter API key:', error);
@@ -106,6 +119,11 @@ const AISettingsScreen: React.FC = () => {
     setLoading(true);
     try {
       await mmkvStorage.setItem('openrouter_api_key', apiKey.trim());
+      if (useDefaultModel || !customModel.trim()) {
+        await mmkvStorage.removeItem('openrouter_model');
+      } else {
+        await mmkvStorage.setItem('openrouter_model', customModel.trim());
+      }
       setIsKeySet(true);
       openAlert(t('common.success'), t('ai_settings.success_saved'));
     } catch (error) {
@@ -252,6 +270,44 @@ const AISettingsScreen: React.FC = () => {
               autoCapitalize="none"
               autoCorrect={false}
             />
+
+            <View style={styles.modelSection}>
+              <View style={styles.modelHeader}>
+                <Text style={[styles.label, { color: currentTheme.colors.highEmphasis }]}>
+                  Model
+                </Text>
+                <Switch
+                  value={useDefaultModel}
+                  onValueChange={setUseDefaultModel}
+                  trackColor={{ false: currentTheme.colors.elevation2, true: currentTheme.colors.primary }}
+                  thumbColor={useDefaultModel ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+                  ios_backgroundColor={currentTheme.colors.elevation2}
+                />
+              </View>
+              <Text style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]}>
+                {useDefaultModel
+                  ? `Using ${DEFAULT_OPENROUTER_MODEL} (free automatic routing).`
+                  : 'Use a custom OpenRouter model ID (useful for paid plans).'}
+              </Text>
+              {!useDefaultModel && (
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: currentTheme.colors.elevation2,
+                      color: currentTheme.colors.highEmphasis,
+                      borderColor: currentTheme.colors.elevation2
+                    }
+                  ]}
+                  value={customModel}
+                  onChangeText={setCustomModel}
+                  placeholder="e.g. openai/gpt-4o-mini"
+                  placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              )}
+            </View>
 
             <View style={styles.buttonContainer}>
               {!isKeySet ? (
@@ -467,6 +523,15 @@ const styles = StyleSheet.create({
   },
   apiKeySection: {
     gap: 12,
+  },
+  modelSection: {
+    gap: 8,
+    marginTop: 4,
+  },
+  modelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   label: {
     fontSize: 16,

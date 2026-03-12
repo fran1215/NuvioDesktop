@@ -102,18 +102,20 @@ export const getTrackDisplayName = (track: { name?: string, id: number, language
     return track.name;
   }
 
-  // If the track name contains detailed information (like codec, bitrate, etc.), use it as-is
+  // If the track name contains detailed information, use it as-is
   if (track.name && (track.name.includes('DDP') || track.name.includes('DTS') || track.name.includes('AAC') ||
-    track.name.includes('Kbps') || track.name.includes('Atmos') || track.name.includes('~'))) {
+    track.name.includes('EAC3') || track.name.includes('AC3') || track.name.includes('TrueHD') ||
+    track.name.includes('Dolby') || track.name.includes('FLAC') || track.name.includes('Opus') ||
+    track.name.includes('Kbps') || track.name.includes('kbps') || track.name.includes('Atmos') ||
+    track.name.includes('5.1') || track.name.includes('7.1') || track.name.includes('6.1') || track.name.includes('2.0') ||
+    track.name.includes('SDH') || track.name.includes('Forced') || track.name.includes('~'))) {
     return track.name;
   }
 
-  // If we have a language field, use that for better display (only for simple track names)
-  if (track.language && track.language !== 'Unknown') {
-    const formattedLanguage = formatLanguage(track.language);
-    if (formattedLanguage !== 'Unknown' && !formattedLanguage.includes('Unknown')) {
-      return formattedLanguage;
-    }
+  // If name is a rich multi-word label (more than one word and not a generic track name), use it as-is
+  const genericTrackMatch = track.name.match(/^(Audio|Track|Subtitle)\s+(\d+)$/i);
+  if (!genericTrackMatch && track.name.trim().includes(' ')) {
+    return track.name;
   }
 
   // Try to extract language from name like "Some Info - [English]"
@@ -122,10 +124,12 @@ export const getTrackDisplayName = (track: { name?: string, id: number, language
     return languageMatch[1];
   }
 
-  // Handle generic VLC track names like "Audio 1", "Track 1"
-  const genericTrackMatch = track.name.match(/^(Audio|Track)\s+(\d+)$/i);
+  // Handle generic VLC track names like "Audio 1", "Track 1" — use language if available
   if (genericTrackMatch) {
-    return `Audio ${genericTrackMatch[2]}`;
+    if (track.language && track.language !== 'Unknown') {
+      return formatLanguage(track.language);
+    }
+    return track.name;
   }
 
   // Check for common language patterns in the name

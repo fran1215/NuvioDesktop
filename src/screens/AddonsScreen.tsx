@@ -733,112 +733,91 @@ const AddonsScreen = () => {
   };
 
   // Add function to handle configuration
-  const handleConfigureAddon = (addon: ExtendedManifest, transportUrl?: string) => {
-    // Try different ways to get the configuration URL
-    let configUrl = '';
+ const ensureSlash = (url: string) =>
+  url.endsWith('/') ? url : url + '/';
 
-    // Debug log the addon data to help troubleshoot
-    logger.info(`Configure addon: ${addon.name}, ID: ${addon.id}`);
-    if (transportUrl) {
-      logger.info(`TransportUrl provided: ${transportUrl}`);
-    }
+const handleConfigureAddon = (addon: ExtendedManifest, transportUrl?: string) => {
+  let configUrl = '';
 
-    // First check if the addon has a configurationURL directly
-    if (addon.behaviorHints?.configurationURL) {
-      configUrl = addon.behaviorHints.configurationURL;
-      logger.info(`Using configurationURL from behaviorHints: ${configUrl}`);
-    }
-    // If a transport URL was provided directly (for community addons)
-    else if (transportUrl) {
-      // Remove any trailing filename like manifest.json
-      const baseUrl = transportUrl.replace(/\/[^\/]+\.json$/, '/');
-      configUrl = `${baseUrl}configure`;
-      logger.info(`Using transportUrl to create config URL: ${configUrl}`);
-    }
-    // If the addon has a url property (this is set during installation)
-    else if (addon.url) {
-      configUrl = `${addon.url}configure`;
-      logger.info(`Using addon.url property: ${configUrl}`);
-    }
-    // For com.stremio.*.addon format (common format for installed addons)
-    else if (addon.id && addon.id.match(/^com\.stremio\.(.*?)\.addon$/)) {
-      // Extract the domain part
-      const match = addon.id.match(/^com\.stremio\.(.*?)\.addon$/);
-      if (match && match[1]) {
-        // Construct URL from the domain part of the ID
-        const addonName = match[1];
-        // For torrentio specifically, use known URL
-        if (addonName === 'torrentio') {
-          configUrl = 'https://torrentio.strem.fun/configure';
-          logger.info(`Special case for torrentio: ${configUrl}`);
-        } else {
-          // Try to construct a reasonable URL for other addons
-          configUrl = `https://${addonName}.strem.fun/configure`;
-          logger.info(`Constructed URL from addon name: ${configUrl}`);
-        }
-      }
-    }
-    // If the ID is a URL, use that as the base (common for installed addons)
-    else if (addon.id && addon.id.startsWith('http')) {
-      // Get base URL from addon id (remove manifest.json or any trailing file)
-      const baseUrl = addon.id.replace(/\/[^\/]+\.json$/, '/');
-      configUrl = `${baseUrl}configure`;
-      logger.info(`Using addon.id as HTTP URL: ${configUrl}`);
-    }
-    // If the ID uses stremio:// protocol but contains http URL (common format)
-    else if (addon.id && (addon.id.includes('https://') || addon.id.includes('http://'))) {
-      // Extract the HTTP URL using a more flexible regex
-      const match = addon.id.match(/(https?:\/\/[^\/]+)(\/[^\s]*)?/);
-      if (match) {
-        // Use the domain and path if available, otherwise just domain with /configure
-        const domain = match[1];
-        const path = match[2] ? match[2].replace(/\/[^\/]+\.json$/, '/') : '/';
-        configUrl = `${domain}${path}configure`;
-        logger.info(`Extracted HTTP URL from stremio:// format: ${configUrl}`);
-      }
-    }
+  logger.info(`Configure addon: ${addon.name}, ID: ${addon.id}`);
+  if (transportUrl) logger.info(`TransportUrl provided: ${transportUrl}`);
 
-    // Special case for common addon format like stremio://addon.stremio.com/...
-    if (!configUrl && addon.id && addon.id.startsWith('stremio://')) {
-      // Try to convert stremio://domain.com/... to https://domain.com/...
-      const domainMatch = addon.id.match(/stremio:\/\/([^\/]+)(\/[^\s]*)?/);
-      if (domainMatch) {
-        const domain = domainMatch[1];
-        const path = domainMatch[2] ? domainMatch[2].replace(/\/[^\/]+\.json$/, '/') : '/';
-        configUrl = `https://${domain}${path}configure`;
-        logger.info(`Converted stremio:// protocol to https:// for config URL: ${configUrl}`);
-      }
+  // 1. behaviorHints.configurationURL
+  if (addon.behaviorHints?.configurationURL) {
+    configUrl = addon.behaviorHints.configurationURL;
+    logger.info(`Using configurationURL from behaviorHints: ${configUrl}`);
+  }
+
+  // 2. transportUrl
+  else if (transportUrl) {
+    const baseUrl = transportUrl.replace(/\/[^\/]+\.json$/, '/');
+    configUrl = `${ensureSlash(baseUrl)}configure`;
+    logger.info(`Using transportUrl to create config URL: ${configUrl}`);
+  }
+
+  // 3. addon.url
+  else if (addon.url) {
+    configUrl = `${ensureSlash(addon.url)}configure`;
+    logger.info(`Using addon.url property: ${configUrl}`);
+  }
+
+ 
+  else if (addon.id && addon.id.startsWith('http')) {
+    const baseUrl = addon.id.replace(/\/[^\/]+\.json$/, '/');
+    configUrl = `${ensureSlash(baseUrl)}configure`;
+    logger.info(`Using addon.id as HTTP URL: ${configUrl}`);
+  }
+
+  // 5. stremio:// containing http/https
+  else if (addon.id && (addon.id.includes('https://') || addon.id.includes('http://'))) {
+    const match = addon.id.match(/(https?:\/\/[^\/]+)(\/[^\s]*)?/);
+    if (match) {
+      const domain = match[1];
+      const path = match[2] ? match[2].replace(/\/[^\/]+\.json$/, '/') : '/';
+      configUrl = `${ensureSlash(domain + path)}configure`;
+      logger.info(`Extracted HTTP URL from stremio:// format: ${configUrl}`);
     }
+  }
 
-    // Use transport property if available (some addons include this)
-    if (!configUrl && addon.transport && typeof addon.transport === 'string' && addon.transport.includes('http')) {
-      const baseUrl = addon.transport.replace(/\/[^\/]+\.json$/, '/');
-      configUrl = `${baseUrl}configure`;
-      logger.info(`Using addon.transport for config URL: ${configUrl}`);
+  // 6. stremio://domain.com
+  if (!configUrl && addon.id && addon.id.startsWith('stremio://')) {
+    const match = addon.id.match(/stremio:\/\/([^\/]+)(\/[^\s]*)?/);
+    if (match) {
+      const domain = match[1];
+      const path = match[2] ? match[2].replace(/\/[^\/]+\.json$/, '/') : '/';
+      configUrl = `${ensureSlash(`https://${domain}${path}`)}configure`;
+      logger.info(`Converted stremio:// protocol to https:// for config URL: ${configUrl}`);
     }
+  }
 
-    // Get the URL from manifest's originalUrl if available
-    if (!configUrl && (addon as any).originalUrl) {
-      const baseUrl = (addon as any).originalUrl.replace(/\/[^\/]+\.json$/, '/');
-      configUrl = `${baseUrl}configure`;
-      logger.info(`Using originalUrl property: ${configUrl}`);
-    }
+  // 7. addon.transport
+  if (!configUrl && addon.transport && addon.transport.includes('http')) {
+    const baseUrl = addon.transport.replace(/\/[^\/]+\.json$/, '/');
+    configUrl = `${ensureSlash(baseUrl)}configure`;
+    logger.info(`Using addon.transport for config URL: ${configUrl}`);
+  }
 
-    // If we couldn't determine a config URL, show an error
-    if (!configUrl) {
-      logger.error(`Failed to determine config URL for addon: ${addon.name}, ID: ${addon.id}`);
-      setAlertTitle(t('addons.config_unavailable_title'));
-      setAlertMessage(t('addons.config_unavailable_msg'));
-      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
-      setAlertVisible(true);
-      return;
-    }
+  // 8. originalUrl
+  if (!configUrl && (addon as any).originalUrl) {
+    const baseUrl = (addon as any).originalUrl.replace(/\/[^\/]+\.json$/, '/');
+    configUrl = `${ensureSlash(baseUrl)}configure`;
+    logger.info(`Using originalUrl property: ${configUrl}`);
+  }
 
-    // Log the URL being opened
-    logger.info(`Opening configuration for addon: ${addon.name} at URL: ${configUrl}`);
+  // 9. Failure
+  if (!configUrl) {
+    logger.error(`Failed to determine config URL for addon: ${addon.name}, ID: ${addon.id}`);
+    setAlertTitle(t('addons.config_unavailable_title'));
+    setAlertMessage(t('addons.config_unavailable_msg'));
+    setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
+    setAlertVisible(true);
+    return;
+  }
 
-    // Check if the URL can be opened
-    Linking.canOpenURL(configUrl).then(supported => {
+  logger.info(`Opening configuration for addon: ${addon.name} at URL: ${configUrl}`);
+
+  Linking.canOpenURL(configUrl)
+    .then(supported => {
       if (supported) {
         Linking.openURL(configUrl);
       } else {
@@ -848,14 +827,16 @@ const AddonsScreen = () => {
         setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
         setAlertVisible(true);
       }
-    }).catch(err => {
+    })
+    .catch(err => {
       logger.error(`Error checking if URL can be opened: ${configUrl}`, err);
       setAlertTitle(t('common.error'));
       setAlertMessage(t('addons.cannot_open_config_msg', { url: configUrl }));
       setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     });
-  };
+};
+
 
   const toggleReorderMode = () => {
     setReorderMode(!reorderMode);

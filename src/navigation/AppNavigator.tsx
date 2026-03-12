@@ -39,6 +39,7 @@ if (Platform.OS === 'ios') {
 import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import SyncSettingsScreen from '../screens/SyncSettingsScreen';
 import DownloadsScreen from '../screens/DownloadsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
 import KSPlayerCore from '../components/player/KSPlayerCore';
@@ -107,6 +108,7 @@ export type RootStackParamList = {
   Home: undefined;
   Library: undefined;
   Settings: undefined;
+  SyncSettings: undefined;
   Update: undefined;
   Search: undefined;
   Calendar: undefined;
@@ -1890,7 +1892,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-          </Stack.Navigator>
+        <Stack.Screen
+          name="SyncSettings"
+          component={SyncSettingsScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
         </View>
       </PaperProvider>
     </>
@@ -1960,7 +1967,6 @@ const ConditionalPostHogProvider: React.FC<{ children: React.ReactNode }> = ({ c
       apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
       options={{
         host: "https://us.i.posthog.com",
-        autocapture: analyticsEnabled,
         // Start opted out if analytics is disabled
         defaultOptIn: analyticsEnabled,
       }}

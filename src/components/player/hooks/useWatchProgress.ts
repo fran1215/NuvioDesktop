@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState } from 'react-native';
 import { storageService } from '../../../services/storageService';
 import { logger } from '../../../utils/logger';
 import { useSettings } from '../../../hooks/useSettings';
@@ -22,17 +22,18 @@ export const useWatchProgress = (
     releaseDate?: string,
     malId?: number,
     dayIndex?: number,
-    tmdbId?: number
+    tmdbId?: number,
+    isInPictureInPicture: boolean = false
 ) => {
     const [resumePosition, setResumePosition] = useState<number | null>(null);
     const [savedDuration, setSavedDuration] = useState<number | null>(null);
     const [initialPosition, setInitialPosition] = useState<number | null>(null);
     const [showResumeOverlay, setShowResumeOverlay] = useState(false);
-    const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
-
     const { settings: appSettings } = useSettings();
     const initialSeekTargetRef = useRef<number | null>(null);
     const hasScrobbledRef = useRef(false);
+    const wasPausedRef = useRef<boolean>(paused);
+    const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
 
     // Values refs for unmount cleanup and stale closure prevention
     const currentTimeRef = useRef(currentTime);
@@ -44,6 +45,7 @@ export const useWatchProgress = (
     const malIdRef = useRef(malId);
     const dayIndexRef = useRef(dayIndex);
     const tmdbIdRef = useRef(tmdbId);
+    const isInPictureInPictureRef = useRef(isInPictureInPicture);
 
     // Sync refs
     useEffect(() => {
@@ -54,7 +56,8 @@ export const useWatchProgress = (
         malIdRef.current = malId;
         dayIndexRef.current = dayIndex;
         tmdbIdRef.current = tmdbId;
-    }, [imdbId, season, episode, releaseDate, malId, dayIndex, tmdbId]);
+        isInPictureInPictureRef.current = isInPictureInPicture;
+    }, [imdbId, season, episode, releaseDate, malId, dayIndex, tmdbId, isInPictureInPicture]);
 
     // Reset scrobble flag when content changes
     useEffect(() => {
@@ -68,13 +71,6 @@ export const useWatchProgress = (
     useEffect(() => {
         durationRef.current = duration;
     }, [duration]);
-
-    useEffect(() => {
-        imdbIdRef.current = imdbId;
-        seasonRef.current = season;
-        episodeRef.current = episode;
-        releaseDateRef.current = releaseDate;
-    }, [imdbId, season, episode, releaseDate]);
 
     // Keep latest traktAutosync ref to avoid dependency cycles in listeners
     const traktAutosyncRef = useRef(traktAutosync);
@@ -99,9 +95,13 @@ export const useWatchProgress = (
                     try {
                         await storageService.setWatchProgress(id, type, progress, episodeId);
 
-                        // Trakt sync (end session)
-                        // Use 'user_close' to force immediate sync
-                        await traktAutosyncRef.current.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'user_close');
+                        if (isInPictureInPictureRef.current) {
+                            logger.log('[useWatchProgress] In PiP mode, skipping background playback end sync');
+                        } else {
+                            // Trakt sync (end session)
+                            // Use 'user_close' to force immediate sync
+                            await traktAutosyncRef.current.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'user_close');
+                        }
                     } catch (error) {
                         logger.error('[useWatchProgress] Error saving background progress:', error);
                     }
@@ -198,8 +198,18 @@ export const useWatchProgress = (
         }
     };
 
-    // Save Interval
+    
     useEffect(() => {
+        // Handle pause transitions (upstream)
+        if (wasPausedRef.current !== paused) {
+            const becamePaused = paused;
+            wasPausedRef.current = paused;
+            if (becamePaused) {
+                void saveWatchProgress();
+            }
+        }
+
+        // Handle periodic save when playing (MAL branch)
         if (id && type && !paused) {
             if (progressSaveInterval) clearInterval(progressSaveInterval);
 

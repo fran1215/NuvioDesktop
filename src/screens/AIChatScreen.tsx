@@ -696,8 +696,14 @@ const AIChatScreen: React.FC = () => {
       if (error instanceof Error) {
         if (error.message.includes('not configured')) {
           errorMessage = 'Please configure your OpenRouter API key in Settings > AI Assistant.';
+        } else if (/401|unauthorized|invalid api key|authentication/i.test(error.message)) {
+          errorMessage = 'OpenRouter rejected your API key. Please verify the key in Settings > AI Assistant.';
+        } else if (/insufficient|credit|quota|429/i.test(error.message)) {
+          errorMessage = 'OpenRouter quota/credits were rejected for this request. Please check your OpenRouter usage and limits.';
+        } else if (/model|provider|endpoint|unsupported|unavailable|not found/i.test(error.message)) {
+          errorMessage = 'The selected OpenRouter model is unavailable. Retry with `openrouter/free` or choose another custom model in Settings > AI Assistant.';
         } else if (error.message.includes('API request failed')) {
-          errorMessage = 'Failed to connect to AI service. Please check your internet connection and API key.';
+          errorMessage = 'Failed to connect to AI service. Please check your internet connection, API key, and OpenRouter model availability.';
         }
       }
 
