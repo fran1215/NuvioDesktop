@@ -3,6 +3,9 @@ import { SimklService } from './simklService';
 import { storageService } from './storageService';
 import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
+import { MalSync } from './mal/MalSync';
+import { MalAuth } from './mal/MalAuth';
+import { ArmSyncService } from './mal/ArmSyncService';
 
 export interface LocalWatchedItem {
     content_id: string;
@@ -15,10 +18,10 @@ export interface LocalWatchedItem {
 
 /**
  * WatchedService - Manages "watched" status for movies, episodes, and seasons.
- * Handles both local storage and Trakt sync transparently.
- *
- * When Trakt is authenticated, it syncs to Trakt.
- * When not authenticated, it stores locally.
+ * Handles both local storage and Trakt/Simkl/MAL sync transparently.
+ * 
+ * When a service is authenticated, it syncs to that service.
+ * Always stores locally for offline access and fallback.
  */
 class WatchedService {
     private static instance: WatchedService;
@@ -198,19 +201,37 @@ class WatchedService {
      */
     public async markMovieAsWatched(
         imdbId: string,
-        watchedAt: Date = new Date()
+        watchedAt: Date = new Date(),
+        malId?: number,
+        tmdbId?: number,
+        title?: string
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
             logger.log(`[WatchedService] Marking movie as watched: ${imdbId}`);
 
-            // Check if Trakt is authenticated
             const isTraktAuth = await this.traktService.isAuthenticated();
             let syncedToTrakt = false;
 
+            // Sync to Trakt
             if (isTraktAuth) {
-                // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedMovies(imdbId, watchedAt);
                 logger.log(`[WatchedService] Trakt sync result for movie: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            if (MalAuth.isAuthenticated()) {
+                MalSync.scrobbleEpisode(
+                    title || 'Movie', // Use real title or generic fallback
+                    1, 
+                    1, 
+                    'movie', 
+                    undefined, 
+                    imdbId,
+                    undefined,
+                    malId,
+                    undefined,
+                    tmdbId
+                ).catch(err => logger.error('[WatchedService] MAL movie sync failed:', err));
             }
 
             // Sync to Simkl
@@ -253,17 +274,21 @@ class WatchedService {
         showId: string,
         season: number,
         episode: number,
-        watchedAt: Date = new Date()
+        watchedAt: Date = new Date(),
+        releaseDate?: string, // Optional release date for precise matching
+        showTitle?: string,
+        malId?: number,
+        dayIndex?: number,
+        tmdbId?: number
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
             logger.log(`[WatchedService] Marking episode as watched: ${showImdbId} S${season}E${episode}`);
 
-            // Check if Trakt is authenticated
             const isTraktAuth = await this.traktService.isAuthenticated();
             let syncedToTrakt = false;
 
+            // Sync to Trakt
             if (isTraktAuth) {
-                // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedEpisodes(
                     showImdbId,
                     season,
@@ -271,6 +296,58 @@ class WatchedService {
                     watchedAt
                 );
                 logger.log(`[WatchedService] Trakt sync result for episode: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            if (MalAuth.isAuthenticated() && (showImdbId || malId || tmdbId)) {
+                // Strategy 0: Direct Match (if malId is provided)
+                let synced = false;
+                if (malId) {
+                    await MalSync.scrobbleDirect(malId, episode);
+                    synced = true;
+                }
+
+                // Strategy 1: TMDB-based Resolution (High Accuracy for Specials)
+                if (!synced && releaseDate && tmdbId) {
+                    try {
+                        const tmdbResult = await ArmSyncService.resolveByTmdb(tmdbId, releaseDate, dayIndex);
+                        if (tmdbResult) {
+                            await MalSync.scrobbleDirect(tmdbResult.malId, tmdbResult.episode);
+                            synced = true;
+                        }
+                    } catch (e) {
+                        logger.warn('[WatchedService] TMDB Sync failed, falling back to IMDb:', e);
+                    }
+                }
+
+                // Strategy 2: IMDb-based Resolution (Fallback)
+                if (!synced && releaseDate && showImdbId) {
+                    try {
+                        const armResult = await ArmSyncService.resolveByDate(showImdbId, releaseDate, dayIndex);
+                        if (armResult) {
+                            await MalSync.scrobbleDirect(armResult.malId, armResult.episode);
+                            synced = true;
+                        }
+                    } catch (e) {
+                        logger.warn('[WatchedService] ARM Sync failed, falling back to offline map:', e);
+                    }
+                }
+
+                // Strategy 3: Offline Mapping / Search Fallback
+                if (!synced) {
+                    MalSync.scrobbleEpisode(
+                        showTitle || showImdbId || 'Anime',
+                        episode,
+                        0,
+                        'series',
+                        season,
+                        showImdbId,
+                        releaseDate, 
+                        malId,
+                        dayIndex,
+                        tmdbId
+                    ).catch(err => logger.error('[WatchedService] MAL sync failed:', err));
+                }
             }
 
             // Sync to Simkl

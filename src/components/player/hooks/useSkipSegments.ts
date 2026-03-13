@@ -9,6 +9,7 @@ interface UseSkipSegmentsProps {
     episode?: number;
     malId?: string;
     kitsuId?: string;
+    releaseDate?: string;
     enabled: boolean;
 }
 
@@ -19,6 +20,7 @@ export const useSkipSegments = ({
     episode,
     malId,
     kitsuId,
+    releaseDate,
     enabled
 }: UseSkipSegmentsProps) => {
     const [segments, setSegments] = useState<SkipInterval[]>([]);
@@ -27,7 +29,7 @@ export const useSkipSegments = ({
     const lastKeyRef = useRef('');
 
     useEffect(() => {
-        const key = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}`;
+        const key = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}-${releaseDate}`;
 
         if (!enabled || type !== 'series' || (!imdbId && !malId && !kitsuId) || !season || !episode) {
             setSegments([]);
@@ -53,7 +55,7 @@ export const useSkipSegments = ({
 
         const fetchSegments = async () => {
             try {
-                const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId);
+                const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId, releaseDate);
 
                 // Ignore stale responses from old requests.
                 if (cancelled || lastKeyRef.current !== key) return;
@@ -76,7 +78,7 @@ export const useSkipSegments = ({
         return () => {
             cancelled = true;
         };
-    }, [imdbId, type, season, episode, malId, kitsuId, enabled]);
+    }, [imdbId, type, season, episode, malId, kitsuId, releaseDate, enabled]);
 
     const getActiveSegment = (currentTime: number) => {
         return segments.find(

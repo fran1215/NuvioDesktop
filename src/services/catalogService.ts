@@ -86,6 +86,13 @@ export interface StreamingContent {
     [key: string]: any;
   };
   imdb_id?: string;
+  mal_id?: number;
+  external_ids?: {
+    mal_id?: number;
+    imdb_id?: string;
+    tmdb_id?: number;
+    tvdb_id?: number;
+  };
   slug?: string;
   releaseInfo?: string;
   traktSource?: 'watchlist' | 'continue-watching' | 'watched';

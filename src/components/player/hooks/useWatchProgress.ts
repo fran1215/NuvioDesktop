@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { storageService } from '../../../services/storageService';
 import { logger } from '../../../utils/logger';
 import { useSettings } from '../../../hooks/useSettings';
+import { watchedService } from '../../../services/watchedService';
 
 export const useWatchProgress = (
     id: string | undefined,
@@ -14,7 +15,16 @@ export const useWatchProgress = (
     traktAutosync: any,
     seekToTime: (time: number) => void,
     addonId?: string,
-    isInPictureInPicture: boolean = false
+    // New parameters for MAL scrobbling
+    imdbId?: string,
+    season?: number,
+    episode?: number,
+    releaseDate?: string,
+    malId?: number,
+    dayIndex?: number,
+    tmdbId?: number,
+    isInPictureInPicture: boolean = false,
+    title?: string
 ) => {
     const [resumePosition, setResumePosition] = useState<number | null>(null);
     const [savedDuration, setSavedDuration] = useState<number | null>(null);
@@ -22,12 +32,40 @@ export const useWatchProgress = (
     const [showResumeOverlay, setShowResumeOverlay] = useState(false);
     const { settings: appSettings } = useSettings();
     const initialSeekTargetRef = useRef<number | null>(null);
+    const hasScrobbledRef = useRef(false);
     const wasPausedRef = useRef<boolean>(paused);
+    const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
 
-    // Values refs for unmount cleanup
+    // Values refs for unmount cleanup and stale closure prevention
     const currentTimeRef = useRef(currentTime);
     const durationRef = useRef(duration);
+    const imdbIdRef = useRef(imdbId);
+    const seasonRef = useRef(season);
+    const episodeRef = useRef(episode);
+    const releaseDateRef = useRef(releaseDate);
+    const malIdRef = useRef(malId);
+    const dayIndexRef = useRef(dayIndex);
+    const tmdbIdRef = useRef(tmdbId);
     const isInPictureInPictureRef = useRef(isInPictureInPicture);
+    const titleRef = useRef(title);
+
+    // Sync refs
+    useEffect(() => {
+        imdbIdRef.current = imdbId;
+        seasonRef.current = season;
+        episodeRef.current = episode;
+        releaseDateRef.current = releaseDate;
+        malIdRef.current = malId;
+        dayIndexRef.current = dayIndex;
+        tmdbIdRef.current = tmdbId;
+        isInPictureInPictureRef.current = isInPictureInPicture;
+        titleRef.current = title;
+    }, [imdbId, season, episode, releaseDate, malId, dayIndex, tmdbId, isInPictureInPicture, title]);
+
+    // Reset scrobble flag when content changes
+    useEffect(() => {
+        hasScrobbledRef.current = false;
+    }, [id, episodeId]);
 
     useEffect(() => {
         currentTimeRef.current = currentTime;
@@ -36,10 +74,6 @@ export const useWatchProgress = (
     useEffect(() => {
         durationRef.current = duration;
     }, [duration]);
-
-    useEffect(() => {
-        isInPictureInPictureRef.current = isInPictureInPicture;
-    }, [isInPictureInPicture]);
 
     // Keep latest traktAutosync ref to avoid dependency cycles in listeners
     const traktAutosyncRef = useRef(traktAutosync);
@@ -129,6 +163,39 @@ export const useWatchProgress = (
             try {
                 await storageService.setWatchProgress(id, type, progress, episodeId);
                 await traktAutosync.handleProgressUpdate(currentTimeRef.current, durationRef.current);
+
+                // Requirement 1: Auto Episode Tracking (>= 90% completion)
+                const progressPercent = (currentTimeRef.current / durationRef.current) * 100;
+                if (progressPercent >= 90 && !hasScrobbledRef.current) {
+                    hasScrobbledRef.current = true;
+                    logger.log(`[useWatchProgress] 90% threshold reached, scrobbling to MAL...`);
+                    
+                    const currentImdbId = imdbIdRef.current;
+                    const currentSeason = seasonRef.current;
+                    const currentEpisode = episodeRef.current;
+                    const currentReleaseDate = releaseDateRef.current;
+                    const currentMalId = malIdRef.current;
+                    const currentDayIndex = dayIndexRef.current;
+                    const currentTmdbId = tmdbIdRef.current;
+                    const currentTitle = titleRef.current;
+
+                    if (type === 'series' && currentImdbId && currentSeason !== undefined && currentEpisode !== undefined) {
+                        watchedService.markEpisodeAsWatched(
+                            currentImdbId, 
+                            id, 
+                            currentSeason, 
+                            currentEpisode, 
+                            new Date(), 
+                            currentReleaseDate,
+                            undefined,
+                            currentMalId,
+                            currentDayIndex,
+                            currentTmdbId
+                        );
+                    } else if (type === 'movie' && currentImdbId) {
+                        watchedService.markMovieAsWatched(currentImdbId, new Date(), currentMalId, currentTmdbId, currentTitle);
+                    }
+                }
             } catch (error) {
                 logger.error('[useWatchProgress] Error saving watch progress:', error);
             }
@@ -137,6 +204,7 @@ export const useWatchProgress = (
 
     
     useEffect(() => {
+        // Handle pause transitions (upstream)
         if (wasPausedRef.current !== paused) {
             const becamePaused = paused;
             wasPausedRef.current = paused;
@@ -144,7 +212,23 @@ export const useWatchProgress = (
                 void saveWatchProgress();
             }
         }
-    }, [paused]);
+
+        // Handle periodic save when playing (MAL branch)
+        if (id && type && !paused) {
+            if (progressSaveInterval) clearInterval(progressSaveInterval);
+
+            // Use refs inside the interval so we don't need to restart it on every second
+            const interval = setInterval(() => {
+                saveWatchProgress();
+            }, 10000);
+
+            setProgressSaveInterval(interval);
+            return () => {
+                clearInterval(interval);
+                setProgressSaveInterval(null);
+            };
+        }
+    }, [id, type, paused]);
 
     // Unmount Save - deferred to allow navigation to complete first
     useEffect(() => {

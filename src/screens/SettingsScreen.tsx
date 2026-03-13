@@ -12,6 +12,7 @@ import {
   Platform,
   Dimensions,
   FlatList,
+  Image,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useTranslation } from 'react-i18next';
@@ -391,7 +392,7 @@ const SettingsScreen: React.FC = () => {
                 }
                 renderControl={() => <ChevronRight />}
                 onPress={() => (navigation as any).navigate('SyncSettings')}
-                isLast={!showTraktItem && !showSimklItem}
+                isLast={!showTraktItem && !showSimklItem && !isItemVisible('mal')}
                 isTablet={isTablet}
               />
             )}
@@ -402,7 +403,7 @@ const SettingsScreen: React.FC = () => {
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
-                isLast={!showSimklItem}
+                isLast={!showSimklItem && !isItemVisible('mal')}
                 isTablet={isTablet}
               />
             )}
@@ -413,6 +414,17 @@ const SettingsScreen: React.FC = () => {
                 customIcon={<SimklIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('SimklSettings')}
+                isLast={!isItemVisible('mal')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('mal') && (
+              <SettingItem
+                title="MyAnimeList"
+                description="Sync with MyAnimeList"
+                customIcon={<Image source={require('../../assets/rating-icons/mal-icon.png')} style={{ width: isTablet ? 24 : 20, height: isTablet ? 24 : 20, borderRadius: 4 }} resizeMode="contain" />}
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('MalSettings')}
                 isLast={true}
                 isTablet={isTablet}
               />
@@ -701,7 +713,7 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Account */}
-            {(settingsConfig?.categories?.['account']?.visible !== false) && (showTraktItem || showSimklItem || showCloudSyncItem) && (
+            {(settingsConfig?.categories?.['account']?.visible !== false) && (showTraktItem || showSimklItem || showCloudSyncItem || isItemVisible('mal')) && (
               <SettingsCard title={t('settings.account').toUpperCase()}>
                 {showCloudSyncItem && (
                   <SettingItem
@@ -716,7 +728,7 @@ const SettingsScreen: React.FC = () => {
                     }
                     renderControl={() => <ChevronRight />}
                     onPress={() => (navigation as any).navigate('SyncSettings')}
-                    isLast={!showTraktItem && !showSimklItem}
+                    isLast={!showTraktItem && !showSimklItem && !isItemVisible('mal')}
                   />
                 )}
                 {showTraktItem && (
@@ -726,7 +738,7 @@ const SettingsScreen: React.FC = () => {
                     customIcon={<TraktIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
-                    isLast={!showSimklItem}
+                    isLast={!showSimklItem && !isItemVisible('mal')}
                   />
                 )}
                 {showSimklItem && (
@@ -736,7 +748,17 @@ const SettingsScreen: React.FC = () => {
                     customIcon={<SimklIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('SimklSettings')}
-                    isLast={true}
+                    isLast={!isItemVisible('mal')}
+                  />
+                )}
+                {isItemVisible('mal') && (
+                  <SettingItem
+                    title="MyAnimeList"
+                    description="Sync with MyAnimeList"
+                    customIcon={<Image source={require('../../assets/rating-icons/mal-icon.png')} style={{ width: 20, height: 20, borderRadius: 4 }} resizeMode="contain" />}
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => navigation.navigate('MalSettings')}
+                    isLast
                   />
                 )}
               </SettingsCard>

@@ -13,6 +13,7 @@ import { mmkvStorage } from '../services/mmkvStorage';
 import { Stream } from '../types/metadata';
 import { storageService } from '../services/storageService';
 import { useSettings } from './useSettings';
+import { MalSync } from '../services/mal/MalSync';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -488,6 +489,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   const loadMetadata = async () => {
     try {
+      console.log('🚀 [useMetadata] loadMetadata CALLED for:', { id, type });
       console.log('🔍 [useMetadata] loadMetadata started:', {
         id,
         type,
@@ -541,6 +543,18 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // Handle TMDB-specific IDs
       let actualId = id;
+
+      // Handle MAL IDs
+      if (id.startsWith('mal:')) {
+          // STRICT MODE: Do NOT convert to IMDb/Cinemeta. 
+          // We want to force the app to use AnimeKitsu (or other MAL-compatible addons) for metadata.
+          // This ensures we get correct Season/Episode mapping (Separate entries) instead of Cinemeta's "S1E26" mess.
+          console.log('🔍 [useMetadata] Keeping MAL ID for metadata fetch:', id);
+          
+          // Note: Stream fetching (stremioService) WILL still convert this to IMDb secretly 
+          // to ensure Torrentio works, but the Metadata UI will stay purely MAL-based.
+      }
+
       if (id.startsWith('tmdb:')) {
         // Always try the original TMDB ID first - let addons decide if they support it
         console.log('🔍 [useMetadata] TMDB ID detected, trying original ID first:', { originalId: id });
@@ -731,7 +745,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       console.log('🔍 [useMetadata] Starting parallel data fetch:', { type, actualId, addonId, apiTimeout: API_TIMEOUT });
       if (__DEV__) logger.log('[loadMetadata] fetching addon metadata', { type, actualId, addonId });
 
-      let contentResult = null;
+      let contentResult: any = null;
       let lastError = null;
 
       // Check if user prefers external meta addons
@@ -814,11 +828,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           const [content, castData] = await Promise.allSettled([
             // Load content with timeout and retry
             withRetry(async () => {
+              console.log('⚡ [useMetadata] Calling catalogService.getEnhancedContentDetails...');
               console.log('🔍 [useMetadata] Calling catalogService.getEnhancedContentDetails:', { type, actualId, addonId });
               const result = await withTimeout(
                 catalogService.getEnhancedContentDetails(type, actualId, addonId),
                 API_TIMEOUT
               );
+              console.log('✅ [useMetadata] catalogService returned:', result ? 'DATA' : 'NULL');
               // Store the actual ID used (could be IMDB)
               if (actualId.startsWith('tt')) {
                 setImdbId(actualId);
@@ -2030,8 +2046,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Start Stremio request using the converted episode ID format
       if (__DEV__) console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
 
-      const requestedContentType = isCollection ? 'movie' : type;
-      const contentType = requestedContentType;
+      // For collections, treat episodes as individual movies, not series
+      // For other types (e.g. StreamsPPV), preserve the original type unless it's explicitly 'series' logic we want
+      const contentType = isCollection ? 'movie' : type;
       if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Using content type: ${contentType} for ${isCollection ? 'collection' : type}`);
 
       processStremioSource(contentType, stremioEpisodeId, true);
