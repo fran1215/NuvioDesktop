@@ -1731,12 +1731,25 @@ class CatalogService {
       if (metas.length > 0) {
         const items = metas.map(meta => {
           const content = this.convertMetaToStreamingContent(meta);
-          content.addonId = manifest.id;
+          // Only set addonId to this addon if it also supports the meta resource.
+          // Search-only addons (e.g. AI search, people search) don't serve metadata —
+          // leaving addonId unset lets useMetadata fall through to a proper meta addon.
+          const addonSupportsMeta = Array.isArray(manifest.resources) && manifest.resources.some((r: any) =>
+            r === 'meta' || (typeof r === 'object' && r?.name === 'meta')
+          );
+
+          if (addonSupportsMeta) {
+            content.addonId = manifest.id;
+          }
           // The meta's own type field may be generic (e.g. "series") even when
           // the catalog it came from is more specific (e.g. "anime.series").
           // Stamp the catalog type so grouping in the UI is correct.
-          if (type && content.type !== type) {
-            content.type = type;
+          // Also lowercase — some addons declare types with capital letters (e.g. "Movie", "Other").
+          const normalizedCatalogType = type ? type.toLowerCase() : type;
+          if (normalizedCatalogType && content.type !== normalizedCatalogType) {
+            content.type = normalizedCatalogType;
+          } else if (content.type) {
+            content.type = content.type.toLowerCase();
           }
           return content;
         });
