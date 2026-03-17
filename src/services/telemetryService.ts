@@ -148,7 +148,6 @@ class TelemetryService {
       }
 
       this.initialized = true;
-      console.log('[TelemetryService] Initialized with settings:', this.settings);
     } catch (error) {
       console.error('[TelemetryService] Error initializing:', error);
       // Use defaults on error

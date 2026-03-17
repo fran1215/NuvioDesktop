@@ -1,8 +1,12 @@
-import { notificationService } from '../notificationService';
 import { mmkvStorage } from '../mmkvStorage';
 import { logger } from '../../utils/logger';
 
 import type { StreamingContent } from './types';
+
+// Lazy import to break require cycle:
+// catalogService -> content-details -> content-mappers -> library -> notificationService -> catalogService
+const getNotificationService = () =>
+  require('../notificationService').notificationService;
 
 export interface CatalogLibraryState {
   LEGACY_LIBRARY_KEY: string;
@@ -259,10 +263,9 @@ export async function addToLibrary(state: CatalogLibraryState, content: Streamin
 
   if (content.type === 'series') {
     try {
-      await notificationService.updateNotificationsForSeries(content.id);
-      console.log(`[CatalogService] Auto-setup notifications for series: ${content.name}`);
+      await getNotificationService().updateNotificationsForSeries(content.id);
     } catch (error) {
-      console.error(`[CatalogService] Failed to setup notifications for ${content.name}:`, error);
+      logger.error(`[CatalogService] Failed to setup notifications for ${content.name}:`, error);
     }
   }
 }
@@ -299,16 +302,14 @@ export async function removeFromLibrary(
 
   if (type === 'series') {
     try {
-      const scheduledNotifications = notificationService.getScheduledNotifications();
-      const seriesToCancel = scheduledNotifications.filter(notification => notification.seriesId === id);
+      const scheduledNotifications = getNotificationService().getScheduledNotifications();
+      const seriesToCancel = scheduledNotifications.filter((notification: any) => notification.seriesId === id);
 
       for (const notification of seriesToCancel) {
-        await notificationService.cancelNotification(notification.id);
+        await getNotificationService().cancelNotification(notification.id);
       }
-
-      console.log(`[CatalogService] Cancelled ${seriesToCancel.length} notifications for removed series: ${id}`);
     } catch (error) {
-      console.error(`[CatalogService] Failed to cancel notifications for removed series ${id}:`, error);
+      logger.error(`[CatalogService] Failed to cancel notifications for removed series ${id}:`, error);
     }
   }
 }

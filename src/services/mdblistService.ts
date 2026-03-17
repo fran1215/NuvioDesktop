@@ -3,8 +3,7 @@ import { logger } from '../utils/logger';
 import { 
   MDBLIST_API_KEY_STORAGE_KEY,
   MDBLIST_ENABLED_STORAGE_KEY,
-  isMDBListEnabled
-} from '../screens/MDBListSettingsScreen';
+} from './mdblistConstants';
 
 export interface MDBListRatings {
   trakt?: number;

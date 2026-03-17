@@ -195,11 +195,9 @@ const ThemedApp = () => {
 
         // Initialize memory monitoring service to prevent OutOfMemoryError
         memoryMonitorService; // Just accessing it starts the monitoring
-        console.log('Memory monitoring service initialized');
 
         // Initialize AI service
         await aiService.initialize();
-        console.log('AI service initialized');
 
       } catch (error) {
         console.error('Error initializing app:', error);

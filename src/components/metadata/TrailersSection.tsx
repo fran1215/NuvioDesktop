@@ -17,11 +17,19 @@ import FastImage from '@d11/react-native-fast-image';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useTrailer } from '../../contexts/TrailerContext';
-import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerModal from './TrailerModal';
 import Animated, { useSharedValue, withTiming, withDelay, useAnimatedStyle } from 'react-native-reanimated';
+
+const noop = (..._args: unknown[]) => {};
+const logger = {
+  log: noop,
+  error: noop,
+  warn: noop,
+  info: noop,
+  debug: noop,
+};
 
 // Enhanced responsive breakpoints for Trailers Section
 const BREAKPOINTS = {

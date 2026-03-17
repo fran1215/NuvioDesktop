@@ -76,9 +76,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           renderMode: 'SOFTWARE' as any, // Fallback to software rendering if hardware fails
         })}
         // Error handling
-        onAnimationFinish={() => {
-          if (__DEV__) console.log('Lottie animation finished');
-        }}
+        onAnimationFinish={() => {}}
         onAnimationFailure={(error) => {
           if (__DEV__) console.warn('Lottie animation failed:', error);
         }}

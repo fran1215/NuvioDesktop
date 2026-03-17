@@ -19,7 +19,7 @@ import Animated, {
   Extrapolate,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
-import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
+import { isMDBListEnabled } from '../../services/mdblistConstants';
 import { getAgeRatingColor } from '../../utils/ageRatingColors';
 import AgeRatingBadge from '../common/AgeRatingBadge';
 

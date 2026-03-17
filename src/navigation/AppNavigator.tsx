@@ -1941,10 +1941,8 @@ const ConditionalPostHogProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (posthogRef.current) {
           if (settings.analyticsEnabled) {
             posthogRef.current.optIn();
-            console.log('[Telemetry] PostHog opted in');
           } else {
             posthogRef.current.optOut();
-            console.log('[Telemetry] PostHog opted out');
           }
         }
       }
@@ -1996,10 +1994,8 @@ const PostHogOptController: React.FC<{
       onPostHogReady(posthog);
       if (enabled) {
         posthog.optIn();
-        console.log('[Telemetry] PostHog opted in');
       } else {
         posthog.optOut();
-        console.log('[Telemetry] PostHog opted out');
       }
     }
   }, [enabled, posthog, onPostHogReady]);

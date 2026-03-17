@@ -5,7 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import FastImage from '@d11/react-native-fast-image';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
 import { mmkvStorage } from '../../services/mmkvStorage';
-import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../screens/MDBListSettingsScreen';
+import { isMDBListEnabled, RATING_PROVIDERS_STORAGE_KEY } from '../../services/mdblistConstants';
 
 // Import SVG icons
 import LetterboxdIcon from '../../../assets/rating-icons/letterboxd.svg';

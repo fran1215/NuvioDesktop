@@ -26,38 +26,18 @@ import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
 import { RATING_PROVIDERS } from '../components/metadata/RatingsSection';
 import CustomAlert from '../components/CustomAlert'; // Moved CustomAlert import here
+import {
+  MDBLIST_API_KEY_STORAGE_KEY,
+  MDBLIST_ENABLED_STORAGE_KEY,
+  RATING_PROVIDERS_STORAGE_KEY,
+  isMDBListEnabled,
+  getMDBListAPIKey,
+} from '../services/mdblistConstants';
 
-export const MDBLIST_API_KEY_STORAGE_KEY = 'mdblist_api_key';
-export const RATING_PROVIDERS_STORAGE_KEY = 'rating_providers_config';
-export const MDBLIST_ENABLED_STORAGE_KEY = 'mdblist_enabled';
+// Re-export for backwards compatibility
+export { MDBLIST_API_KEY_STORAGE_KEY, RATING_PROVIDERS_STORAGE_KEY, MDBLIST_ENABLED_STORAGE_KEY, isMDBListEnabled, getMDBListAPIKey };
+
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
-
-// Function to check if MDBList is enabled
-export const isMDBListEnabled = async (): Promise<boolean> => {
-  try {
-    const enabledSetting = await mmkvStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
-    return enabledSetting === 'true';
-  } catch (error) {
-    logger.error('[MDBList] Error checking if MDBList is enabled:', error);
-    return false; // Default to disabled if there's an error
-  }
-};
-
-// Function to get MDBList API key if enabled
-export const getMDBListAPIKey = async (): Promise<string | null> => {
-  try {
-    const isEnabled = await isMDBListEnabled();
-    if (!isEnabled) {
-      logger.log('[MDBList] MDBList is disabled, not retrieving API key');
-      return null;
-    }
-
-    return await mmkvStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
-  } catch (error) {
-    logger.error('[MDBList] Error retrieving API key:', error);
-    return null;
-  }
-};
 
 // Create a styles creator function that accepts the theme colors
 const createStyles = (colors: any) => StyleSheet.create({

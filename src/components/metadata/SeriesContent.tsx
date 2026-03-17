@@ -15,9 +15,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { TraktService } from '../../services/traktService';
 import { watchedService } from '../../services/watchedService';
-import { logger } from '../../utils/logger';
 import { mmkvStorage } from '../../services/mmkvStorage';
 import { MalSync } from '../../services/mal/MalSync';
+
+const noop = (..._args: unknown[]) => {};
+const logger = {
+  log: noop,
+  error: noop,
+  warn: noop,
+  info: noop,
+  debug: noop,
+};
 
 // ... other imports
 const BREAKPOINTS = {
@@ -212,10 +220,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         const savedMode = await mmkvStorage.getItem('global_season_view_mode');
         if (savedMode === 'text' || savedMode === 'posters') {
           setSeasonViewMode(savedMode);
-          if (__DEV__) console.log('[SeriesContent] Loaded global view mode:', savedMode);
+          if (__DEV__) logger.log('[SeriesContent] Loaded global view mode:', savedMode);
         }
       } catch (error) {
-        if (__DEV__) console.log('[SeriesContent] Error loading global view mode preference:', error);
+        if (__DEV__) logger.log('[SeriesContent] Error loading global view mode preference:', error);
       }
     };
 
@@ -239,7 +247,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const updateViewMode = (newMode: 'posters' | 'text') => {
     setSeasonViewMode(newMode);
     mmkvStorage.setItem('global_season_view_mode', newMode).catch((error: any) => {
-      if (__DEV__) console.log('[SeriesContent] Error saving global view mode preference:', error);
+      if (__DEV__) logger.log('[SeriesContent] Error saving global view mode preference:', error);
     });
   };
 
@@ -491,7 +499,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   useEffect(() => {
     return () => {
       // Clear any pending timeouts
-      if (__DEV__) console.log('[SeriesContent] Component unmounted, cleaning up memory');
+      if (__DEV__) logger.log('[SeriesContent] Component unmounted, cleaning up memory');
 
       // Force garbage collection if available (development only)
       if (__DEV__ && global.gc) {
@@ -854,7 +862,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             onPress={() => {
               const newMode = seasonViewMode === 'posters' ? 'text' : 'posters';
               updateViewMode(newMode);
-              if (__DEV__) console.log('[SeriesContent] View mode changed to:', newMode, 'Current ref value:', seasonViewMode);
+              if (__DEV__) logger.log('[SeriesContent] View mode changed to:', newMode, 'Current ref value:', seasonViewMode);
             }}
             activeOpacity={0.7}
           >

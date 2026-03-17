@@ -216,11 +216,9 @@ export const CampaignManager: React.FC = () => {
 
     const checkForCampaigns = useCallback(async () => {
         try {
-            console.log('[CampaignManager] Checking for campaigns...');
             await new Promise(resolve => setTimeout(resolve, 1500));
 
             const campaign = await campaignService.getActiveCampaign();
-            console.log('[CampaignManager] Got campaign:', campaign?.id, campaign?.type);
 
             if (campaign) {
                 setActiveCampaign(campaign);
