@@ -533,7 +533,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     // @ts-ignore - Prop supported by patched react-native-video
                     onPictureInPictureStatusChanged={handleExoPictureInPictureStatusChanged}
                     automaticallyWaitsToMinimizeStalling={true}
-                    useTextureView={true}
+                    useTextureView={false}
                     subtitleStyle={{
                         fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 28,
                         paddingTop: 0,
