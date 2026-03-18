@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { MalSync } from './mal/MalSync';
 import { MalAuth } from './mal/MalAuth';
 import { ArmSyncService } from './mal/ArmSyncService';
+import { MalApiService } from './mal/MalApi';
 
 export interface LocalWatchedItem {
     content_id: string;
@@ -577,10 +578,16 @@ class WatchedService {
     /**
      * Unmark a movie as watched (remove from history).
      * @param imdbId - The primary content ID (may be a provider ID like "kitsu:123")
+     * @param malId - Optional MAL ID
+     * @param tmdbId - Optional TMDB ID
+     * @param title - Optional title
      * @param fallbackImdbId - The resolved IMDb ID from metadata (used when imdbId isn't IMDb format)
      */
     public async unmarkMovieAsWatched(
         imdbId: string,
+        malId?: number,
+        tmdbId?: number,
+        title?: string,
         fallbackImdbId?: string
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
@@ -592,6 +599,21 @@ class WatchedService {
             if (isTraktAuth) {
                 syncedToTrakt = await this.traktService.removeMovieFromHistory(imdbId, fallbackImdbId);
                 logger.log(`[WatchedService] Trakt remove result for movie: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            if (MalAuth.isAuthenticated()) {
+                MalSync.unscrobbleEpisode(
+                    title || 'Movie',
+                    1,
+                    'movie',
+                    undefined,
+                    imdbId,
+                    undefined,
+                    malId,
+                    undefined,
+                    tmdbId
+                ).catch(err => logger.error('[WatchedService] MAL movie unsync failed:', err));
             }
 
             // Simkl Unmark — try both IDs
@@ -627,7 +649,12 @@ class WatchedService {
         showImdbId: string,
         showId: string,
         season: number,
-        episode: number
+        episode: number,
+        releaseDate?: string,
+        showTitle?: string,
+        malId?: number,
+        dayIndex?: number,
+        tmdbId?: number
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
             logger.log(`[WatchedService] Unmarking episode as watched: ${showImdbId} S${season}E${episode}`);
@@ -645,6 +672,21 @@ class WatchedService {
                     fallback
                 );
                 logger.log(`[WatchedService] Trakt remove result for episode: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            if (MalAuth.isAuthenticated()) {
+                MalSync.unscrobbleEpisode(
+                    showTitle || 'Anime',
+                    episode,
+                    'series',
+                    season,
+                    showImdbId,
+                    releaseDate,
+                    malId,
+                    dayIndex,
+                    tmdbId
+                ).catch(err => logger.error('[WatchedService] MAL unsync failed:', err));
             }
 
             // Simkl Unmark — use best available ID
@@ -688,7 +730,12 @@ class WatchedService {
         showImdbId: string,
         showId: string,
         season: number,
-        episodeNumbers: number[]
+        episodeNumbers: number[],
+        releaseDate?: string,
+        showTitle?: string,
+        malId?: number,
+        dayIndex?: number,
+        tmdbId?: number
     ): Promise<{ success: boolean; syncedToTrakt: boolean; count: number }> {
         try {
             logger.log(`[WatchedService] Unmarking season ${season} as watched for ${showImdbId}`);
@@ -706,6 +753,79 @@ class WatchedService {
                     fallback
                 );
                 logger.log(`[WatchedService] Trakt season removal result: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL (Unscrobble the latest episode in this season ONLY if it's the one we're currently on)
+            if (MalAuth.isAuthenticated() && episodeNumbers.length > 0) {
+                const maxEpisodeInSeason = Math.max(...episodeNumbers);
+                
+                const resolveAndUnscrobble = async () => {
+                    try {
+                        // Use the robust resolution logic from MalSync.unscrobbleEpisode 
+                        // to find the ACTUAL malId and absolute episode number
+                        let finalMalId = malId;
+                        let resolvedEpisode = maxEpisodeInSeason;
+
+                        // 1. Try TMDB Resolution
+                        if (!finalMalId && tmdbId && releaseDate) {
+                            const tmdbResult = await ArmSyncService.resolveByTmdb(tmdbId, releaseDate, dayIndex);
+                            if (tmdbResult) {
+                                finalMalId = tmdbResult.malId;
+                                resolvedEpisode = tmdbResult.episode;
+                            }
+                        }
+
+                        // 2. Try IMDb/ARM Fallback
+                        if (!finalMalId && showImdbId && releaseDate) {
+                            const armResult = await ArmSyncService.resolveByDate(showImdbId, releaseDate, dayIndex);
+                            if (armResult) {
+                                finalMalId = armResult.malId;
+                                resolvedEpisode = armResult.episode;
+                            }
+                        }
+
+                        // 3. Last resort: Standard lookup
+                        if (!finalMalId) {
+                             finalMalId = (await MalSync.getMalId(
+                                 showTitle || 'Anime', 
+                                 'series', 
+                                 undefined, 
+                                 season, 
+                                 showImdbId, 
+                                 maxEpisodeInSeason, 
+                                 releaseDate, 
+                                 dayIndex, 
+                                 tmdbId
+                             )) || undefined;
+                        }
+
+                        if (finalMalId) {
+                            const currentInfo = await MalApiService.getMyListStatus(finalMalId);
+                            const currentlyWatched = currentInfo.my_list_status?.num_episodes_watched || 0;
+
+                            // Only unscrobble if the season's end matches our current progress
+                            if (currentlyWatched === resolvedEpisode) {
+                                // Calculate the episode count BEFORE this season started
+                                const minEpisodeInSeason = Math.min(...episodeNumbers);
+                                const newCount = Math.max(0, minEpisodeInSeason - 1);
+                                
+                                let newStatus: any = currentInfo.my_list_status?.status || 'watching';
+                                if (newCount === 0 && newStatus === 'watching') {
+                                    // Optional: could move to plan_to_watch
+                                } else if (newStatus === 'completed') {
+                                    newStatus = 'watching';
+                                }
+
+                                await MalApiService.updateStatus(finalMalId, newStatus, newCount);
+                                logger.log(`[WatchedService] Unmarked season: MAL ID ${finalMalId} reverted to Ep ${newCount}`);
+                            }
+                        }
+                    } catch (e) {
+                        logger.error('[WatchedService] MAL season unsync resolution failed:', e);
+                    }
+                };
+                
+                resolveAndUnscrobble();
             }
 
             // Sync to Simkl — use best available ID

@@ -650,12 +650,30 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
     // 3. Background Async Operation
     const showImdbId = imdbId || metadata.id;
+    const malId = (metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id;
+    const tmdbId = (metadata as any)?.tmdbId || (metadata as any)?.external_ids?.tmdb_id;
+
+    // Calculate dayIndex for same-day releases
+    let dayIndex = 0;
+    if (episode.air_date) {
+      const sameDayEpisodes = episodes
+        .filter(ep => ep.air_date === episode.air_date)
+        .sort((a, b) => a.episode_number - b.episode_number);
+      dayIndex = sameDayEpisodes.findIndex(ep => ep.episode_number === episode.episode_number);
+      if (dayIndex < 0) dayIndex = 0;
+    }
+
     try {
       const result = await watchedService.unmarkEpisodeAsWatched(
-        showImdbId,
-        metadata.id,
+        showImdbId || '',
+        metadata.id || '',
         episode.season_number,
-        episode.episode_number
+        episode.episode_number,
+        episode.air_date,
+        metadata?.name,
+        malId,
+        dayIndex,
+        tmdbId
       );
 
       loadEpisodesProgress(); // Sync with source of truth
@@ -768,12 +786,23 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
     // 3. Background Async Operation
     const showImdbId = imdbId || metadata.id;
+    const malId = (metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id;
+    const tmdbId = (metadata as any)?.tmdbId || (metadata as any)?.external_ids?.tmdb_id;
+
+    const lastEp = Math.max(...episodeNumbers);
+    const lastEpisodeData = seasonEpisodes.find(e => e.episode_number === lastEp);
+
     try {
       const result = await watchedService.unmarkSeasonAsWatched(
-        showImdbId,
-        metadata.id,
+        showImdbId || '',
+        metadata.id || '',
         currentSeason,
-        episodeNumbers
+        episodeNumbers,
+        lastEpisodeData?.air_date,
+        metadata?.name,
+        malId,
+        0, // dayIndex (assuming 0 for season batch unmarking)
+        tmdbId
       );
 
       // Re-sync
