@@ -22,6 +22,23 @@ interface TraktAutosyncOptions {
   episodeId?: string;
 }
 
+// Module-level map: contentKey → { stoppedAt, progress, isComplete }
+// Survives component unmount/remount so re-mounting the player for the same
+// content (e.g. app background → resume) doesn't fire a duplicate scrobble/start.
+const recentlyStoppedSessions = new Map<string, {
+  stoppedAt: number;
+  progress: number;
+  isComplete: boolean;
+}>();
+const SESSION_RESUME_WINDOW_MS = 20 * 60 * 1000; // 20 minutes
+
+function getContentKey(opts: TraktAutosyncOptions): string {
+  const resolvedId = (opts.imdbId && opts.imdbId.trim()) ? opts.imdbId : (opts.id || '');
+  return opts.type === 'movie'
+    ? `movie:${resolvedId}`
+    : `episode:${opts.showImdbId || resolvedId}:${opts.season}:${opts.episode}`;
+}
+
 export function useTraktAutosync(options: TraktAutosyncOptions) {
   const {
     isAuthenticated,
@@ -53,24 +70,39 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
   // Generate a unique session key for this content instance
   useEffect(() => {
-    const resolvedId = (options.imdbId && options.imdbId.trim()) ? options.imdbId : (options.id || '');
-    const contentKey = options.type === 'movie'
-      ? `movie:${resolvedId}`
-      : `episode:${options.showImdbId || resolvedId}:${options.season}:${options.episode}`;
+    const contentKey = getContentKey(options);
     sessionKey.current = `${contentKey}:${Date.now()}`;
+    isUnmounted.current = false;
+    unmountCount.current = 0;
 
-    // Reset all session state for new content
-    hasStartedWatching.current = false;
-    hasStopped.current = false;
-    isSessionComplete.current = false;
-    isUnmounted.current = false; // Reset unmount flag for new mount
-    lastStopCall.current = 0;
-
-    logger.log(`[TraktAutosync] Session started for: ${sessionKey.current}`);
+    // Check if we're re-mounting for the same content within the resume window.
+    // If so, restore the stopped/complete state so we don't fire a duplicate start.
+    const prior = recentlyStoppedSessions.get(contentKey);
+    const now = Date.now();
+    if (prior && (now - prior.stoppedAt) < SESSION_RESUME_WINDOW_MS) {
+      hasStartedWatching.current = false; // will re-start cleanly if needed
+      hasStopped.current = prior.isComplete ? true : prior.progress > 0; // block restart if already stopped
+      isSessionComplete.current = prior.isComplete;
+      lastSyncProgress.current = prior.progress;
+      lastStopCall.current = prior.stoppedAt;
+      logger.log(`[TraktAutosync] Remount detected for same content within ${SESSION_RESUME_WINDOW_MS / 1000}s window. Restoring: hasStopped=${hasStopped.current}, isComplete=${isSessionComplete.current}, progress=${prior.progress.toFixed(1)}%`);
+    } else {
+      // Genuinely new content or window expired — reset everything
+      hasStartedWatching.current = false;
+      hasStopped.current = false;
+      isSessionComplete.current = false;
+      lastStopCall.current = 0;
+      lastSyncProgress.current = 0;
+      lastSyncTime.current = 0;
+      if (prior) {
+        recentlyStoppedSessions.delete(contentKey);
+      }
+      logger.log(`[TraktAutosync] New session started for: ${sessionKey.current}`);
+    }
 
     return () => {
       unmountCount.current++;
-      isUnmounted.current = true; // Mark as unmounted to prevent post-unmount operations
+      isUnmounted.current = true;
       logger.log(`[TraktAutosync] Component unmount #${unmountCount.current} for: ${sessionKey.current}`);
     };
   }, [options.imdbId, options.season, options.episode, options.type]);
@@ -274,6 +306,14 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     // Skip if session is already complete
     if (isSessionComplete.current) {
+      return;
+    }
+
+    // Skip if session was already stopped (e.g. after background/pause).
+    // Without this, the fallback "force start" block inside handleProgressUpdate
+    // would fire a new /scrobble/start on the first periodic save after a remount,
+    // bypassing the hasStopped guard in handlePlaybackStart entirely.
+    if (hasStopped.current) {
       return;
     }
 
@@ -511,6 +551,15 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       lastStopCall.current = now;
       hasStopped.current = true;
 
+      // Persist to module-level map so a remount for the same content within the
+      // resume window won't fire a duplicate scrobble/start.
+      const contentKey = getContentKey(options);
+      recentlyStoppedSessions.set(contentKey, {
+        stoppedAt: now,
+        progress: progressPercent,
+        isComplete: false // updated below if scrobble succeeds at threshold
+      });
+
       const contentData = buildContentData();
 
       // Skip if content data is invalid
@@ -549,6 +598,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       } else if (shouldSyncTrakt) {
         // If Trakt stop failed, reset the stop flag so we can try again later
         hasStopped.current = false;
+        recentlyStoppedSessions.delete(getContentKey(options));
         logger.warn(`[TraktAutosync] Trakt: Failed to stop watching, reset stop flag for retry`);
       }
 
@@ -573,6 +623,12 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         // Mark session as complete if >= user completion threshold
         if (progressPercent >= autosyncSettings.completionThreshold) {
           isSessionComplete.current = true;
+          // Update module-level map to reflect completion so a remount won't restart
+          const ck = getContentKey(options);
+          const existing = recentlyStoppedSessions.get(ck);
+          if (existing) {
+            recentlyStoppedSessions.set(ck, { ...existing, isComplete: true, progress: progressPercent });
+          }
           logger.log(`[TraktAutosync] Session marked as complete (scrobbled) at ${progressPercent.toFixed(1)}%`);
 
           // Ensure local watch progress reflects completion so UI shows as watched
@@ -633,6 +689,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     unmountCount.current = 0;
     sessionKey.current = null;
     lastStopCall.current = 0;
+    recentlyStoppedSessions.delete(getContentKey(options));
     logger.log(`[TraktAutosync] Manual state reset for: ${options.title}`);
   }, [options.title]);
 
