@@ -33,11 +33,7 @@ import { mmkvStorage } from '../services/mmkvStorage';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Trakt configuration
-const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string;
-
-if (!TRAKT_CLIENT_ID) {
-  throw new Error('Missing EXPO_PUBLIC_TRAKT_CLIENT_ID environment variable');
-}
+const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string | undefined;
 
 const discovery = {
   authorizationEndpoint: 'https://trakt.tv/oauth/authorize',
@@ -61,6 +57,20 @@ const LIBRARY_SYNC_MODE_OPTIONS = [
 
 const TraktSettingsScreen: React.FC = () => {
   const { t } = useTranslation();
+  if (!TRAKT_CLIENT_ID) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.missingConfigContainer}>
+          <Text style={styles.missingConfigTitle}>Trakt is unavailable</Text>
+          <Text style={styles.missingConfigText}>
+            This build does not have Trakt OAuth configured, so the integration is disabled here.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const { settings, updateSetting } = useSettings();
   const isDarkMode = settings.enableDarkMode;
   const navigation = useNavigation();
@@ -808,6 +818,27 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 32,
+  },
+  missingConfigContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: '#000',
+  },
+  missingConfigTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  missingConfigText: {
+    marginTop: 12,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    maxWidth: 560,
   },
   card: {
     borderRadius: 12,

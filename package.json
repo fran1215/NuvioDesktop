@@ -2,11 +2,16 @@
   "name": "nuvio",
   "version": "0.6.0-beta.16",
   "main": "index.ts",
+  "homepage": "./",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "build": "export NODE_ENV=production && export SENTRY_DISABLE_AUTO_UPLOAD=true && cd android && ./gradlew assembleRelease",
+    "web-build": "expo export -p web --output-dir web-build",
+    "electron": "npm run web-build && electron electron/main.js",
+    "electron-dev": "npm run web-build && electron electron/main.js",
+    "electron-build": "npm run web-build && electron-builder",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -67,6 +72,7 @@
     "expo-system-ui": "~6.0.7",
     "expo-updates": "~29.0.12",
     "expo-web-browser": "~15.0.8",
+    "express": "^5.2.1",
     "i18next": "^25.8.18",
     "intl-pluralrules": "^2.0.1",
     "lodash": "^4.17.23",
@@ -106,13 +112,56 @@
     "@types/react-native": "^0.72.8",
     "@types/react-native-vector-icons": "^6.4.18",
     "babel-plugin-transform-remove-console": "^6.9.4",
+    "concurrently": "^9.0.1",
+    "electron": "^41.3.0",
+    "electron-builder": "^25.1.6",
+    "electron-is-dev": "^3.0.1",
     "patch-package": "^8.0.1",
     "react-native-svg-transformer": "^1.5.3",
     "typescript": "^5.9.3",
+    "wait-on": "^8.0.1",
     "xcode": "^3.0.1"
   },
   "overrides": {
     "@types/react": "~18.3.12"
+  },
+  "build": {
+    "appId": "com.nuvio.app",
+    "productName": "Nuvio",
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "files": [
+      "web-build/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ]
+    }
   },
   "private": true
 }

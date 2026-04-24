@@ -1,6 +1,7 @@
 const {
   getSentryExpoConfig
 } = require("@sentry/react-native/metro");
+const path = require('path');
 
 const config = getSentryExpoConfig(__dirname);
 
@@ -28,6 +29,16 @@ config.resolver = {
   assetExts: [...config.resolver.assetExts.filter((ext) => ext !== 'svg'), 'zip'],
   sourceExts: [...config.resolver.sourceExts, 'svg'],
   resolverMainFields: ['react-native', 'browser', 'main'],
+  resolveRequest: (context, moduleName, platform) => {
+    if (platform === 'web' && moduleName === '@d11/react-native-fast-image') {
+      return {
+        type: 'sourceFile',
+        filePath: path.resolve(__dirname, 'src/shims/FastImage.web.tsx'),
+      };
+    }
+
+    return context.resolveRequest(context, moduleName, platform);
+  },
 };
 
 module.exports = config;

@@ -19,6 +19,7 @@ import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { ScrollToTopProvider, useScrollToTopEmitter } from '../contexts/ScrollToTopContext';
 import { telemetryService, TELEMETRY_EVENTS } from '../services/telemetryService';
 import { useTranslation } from 'react-i18next';
+import DesktopPlayer from '../components/player/DesktopPlayer';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback
 let GlassViewComp: any = null;
@@ -42,8 +43,12 @@ import SettingsScreen from '../screens/SettingsScreen';
 import SyncSettingsScreen from '../screens/SyncSettingsScreen';
 import DownloadsScreen from '../screens/DownloadsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
-import KSPlayerCore from '../components/player/KSPlayerCore';
-import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
+const KSPlayerCoreScreen = Platform.OS === 'ios' && Platform.OS !== 'web'
+  ? require('../components/player/KSPlayerCore').default
+  : DesktopPlayer;
+const AndroidVideoPlayerScreen = Platform.OS === 'web'
+  ? DesktopPlayer
+  : require('../components/player/AndroidVideoPlayer').default;
 import CatalogScreen from '../screens/CatalogScreen';
 import AddonsScreen from '../screens/AddonsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -1353,7 +1358,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="PlayerIOS"
-              component={KSPlayerCore as any}
+              component={KSPlayerCoreScreen as any}
               options={{
                 animation: 'default',
                 animationDuration: 0,
@@ -1375,7 +1380,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="PlayerAndroid"
-              component={AndroidVideoPlayer as any}
+              component={AndroidVideoPlayerScreen as any}
               options={{
                 animation: 'none',
                 animationDuration: 0,
@@ -1912,6 +1917,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
  * Uses PostHog's optIn/optOut API for runtime control.
  */
 const ConditionalPostHogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (Platform.OS === 'web') {
+    return <>{children}</>;
+  }
+
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const posthogRef = useRef<any>(null);

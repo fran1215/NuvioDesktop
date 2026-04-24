@@ -30,6 +30,10 @@ export const shouldUseKSPlayer = ({
     return true;
   }
 
+  if (platform === 'web') {
+    return false;
+  }
+
   // Default fallback
   return false;
 };
@@ -37,6 +41,10 @@ export const shouldUseKSPlayer = ({
 /**
  * Get the appropriate player component name
  */
-export const getPlayerComponent = (options: PlayerSelectionOptions): 'AndroidVideoPlayer' | 'KSPlayerCore' => {
+export const getPlayerComponent = (options: PlayerSelectionOptions): 'AndroidVideoPlayer' | 'KSPlayerCore' | 'DesktopPlayer' => {
+  if ((options.platform ?? Platform.OS) === 'web') {
+    return 'DesktopPlayer';
+  }
+
   return shouldUseKSPlayer(options) ? 'KSPlayerCore' : 'AndroidVideoPlayer';
 };

@@ -1344,14 +1344,17 @@ class LocalScraperService {
       const moduleObj = { exports: moduleExports };
 
       // Load cheerio (try multiple package names for compatibility)
+      // Skip on web/Electron as cheerio-without-node-native uses Node APIs (__dirname)
       let cheerio: any = null;
-      try {
-        cheerio = require('cheerio-without-node-native');
-      } catch {
+      if (Platform.OS !== 'web') {
         try {
-          cheerio = require('react-native-cheerio');
+          cheerio = require('cheerio-without-node-native');
         } catch {
-          // Cheerio not available - plugins will need to use regex
+          try {
+            cheerio = require('react-native-cheerio');
+          } catch {
+            // Cheerio not available - plugins will need to use regex
+          }
         }
       }
 

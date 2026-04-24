@@ -281,7 +281,7 @@ const ThemedApp = () => {
                 isDownloading={isDownloadingGitHub}
                 downloadProgress={downloadProgress}
               />
-              <CampaignManager />
+              {Platform.OS !== 'web' && <CampaignManager />}
             </View>
           </DownloadsProvider>
         </NavigationContainer>

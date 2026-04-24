@@ -18,10 +18,10 @@
 
 import { mmkvStorage } from './mmkvStorage';
 import { DeviceEventEmitter } from 'react-native';
-import { createMMKV } from 'react-native-mmkv';
+import { platformStorage } from './platformStorage';
 
-// Direct MMKV access for synchronous reads (needed for Sentry beforeSend)
-const directMMKV = createMMKV();
+// Direct storage access for synchronous reads (needed for Sentry beforeSend)
+const directMMKV = platformStorage;
 
 // Storage keys for telemetry preferences
 const TELEMETRY_KEYS = {

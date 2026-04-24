@@ -1,9 +1,9 @@
-import { createMMKV } from 'react-native-mmkv';
 import { logger } from '../utils/logger';
+import { platformStorage } from './platformStorage';
 
 class MMKVStorage {
   private static instance: MMKVStorage;
-  private storage = createMMKV();
+  private storage = platformStorage;
   // In-memory cache for frequently accessed data
   private cache = new Map<string, { value: any; timestamp: number }>();
   private readonly CACHE_TTL = 30000; // 30 seconds

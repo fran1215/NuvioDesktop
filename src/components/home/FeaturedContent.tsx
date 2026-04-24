@@ -221,17 +221,18 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
       // Simplified validation to reduce CPU overhead
       if (!url || typeof url !== 'string') return false;
 
-      // Add timeout guard to prevent hanging preloads
-      const timeout = new Promise<never>((_, reject) => {
-        const t = setTimeout(() => {
-          clearTimeout(t as any);
-          reject(new Error('preload-timeout'));
-        }, 1500);
-      });
+      // Use Image.prefetch on web and FastImage.preload elsewhere.
+      if (Platform.OS === 'web') {
+        await Promise.race([
+          Image.prefetch(url),
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => resolve(false), 1500);
+          }),
+        ]);
+      } else {
+        FastImage.preload([{ uri: url }]);
+      }
 
-      // FastImage.preload doesn't return a promise, so we just call it and use timeout
-      FastImage.preload([{ uri: url }]);
-      await timeout;
       imageCache[url] = true;
       logger.debug('[FeaturedContent] preloadImage:success', { url, duration: since(t0) });
       return true;
