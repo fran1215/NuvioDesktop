@@ -30,6 +30,8 @@ function startServer() {
 }
 
 function createWindow() {
+  const FIXED_WINDOW_TITLE = 'Nuvio Desktop';
+
   // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -43,6 +45,15 @@ function createWindow() {
       nodeIntegration: false,
     },
     icon: path.join(__dirname, '../assets/AppIcons/icon.png'),
+    title: FIXED_WINDOW_TITLE,
+  });
+
+  // Prevent web document.title changes from altering the native window title.
+  mainWindow.on('page-title-updated', (event) => {
+    event.preventDefault();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setTitle(FIXED_WINDOW_TITLE);
+    }
   });
 
   // Load from local server

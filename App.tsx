@@ -246,6 +246,9 @@ const ThemedApp = () => {
         <NavigationContainer
           ref={navigationRef}
           theme={customNavigationTheme}
+          documentTitle={{
+            enabled: false,
+          }}
           linking={{
             prefixes: ['nuvio://'],
             config: {
