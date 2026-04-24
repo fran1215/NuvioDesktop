@@ -38,6 +38,12 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 
 ## Development
 
+### Native folders and sync notes
+
+- Keep `android/` and `ios/` in this repo. They are still used for the mobile build and for the native modules that Expo prebuild generates.
+- If you sync changes from the original repo, preserve these folders and re-run the native build steps instead of deleting them.
+- Older migration archives such as `backup_sdk54_upgrade/` are not used by the app at runtime and can be removed once you have verified the current native folders are working.
+
 ```bash
 git clone https://github.com/tapframe/NuvioStreaming.git
 cd NuvioStreaming
