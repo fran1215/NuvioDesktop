@@ -12,7 +12,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withTiming,
   FadeIn,
   FadeInUp,
   useAnimatedScrollHandler,
@@ -196,12 +195,16 @@ const OnboardingScreen = () => {
     };
   });
 
+  const isLastSlide = currentIndex === onboardingData.length - 1;
+
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
       const nextIndex = currentIndex + 1;
-      flatListRef.current?.scrollToOffset({
-        offset: nextIndex * width,
-        animated: true
+      setCurrentIndex(nextIndex);
+      flatListRef.current?.scrollToIndex({
+        index: nextIndex,
+        animated: true,
+        viewPosition: 0,
       });
     } else {
       handleGetStarted();
@@ -225,6 +228,17 @@ const OnboardingScreen = () => {
     } catch (error) {
       if (__DEV__) console.error('Error saving onboarding status:', error);
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }
+  };
+
+  const handleDevResetOnboarding = async () => {
+    try {
+      await mmkvStorage.removeItem('hasCompletedOnboarding');
+      await mmkvStorage.removeItem('showLoginHintToastOnce');
+      setCurrentIndex(0);
+      flatListRef.current?.scrollToIndex({ index: 0, animated: true, viewPosition: 0 });
+    } catch (error) {
+      if (__DEV__) console.error('Error resetting onboarding keys:', error);
     }
   };
 
@@ -264,29 +278,6 @@ const OnboardingScreen = () => {
     transform: [{ scale: buttonScale.value }],
   }));
 
-  // Animated opacity for button and swipe indicator based on scroll
-  const lastSlideStart = (onboardingData.length - 1) * width;
-
-  const buttonOpacityStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      scrollX.value,
-      [lastSlideStart - width * 0.3, lastSlideStart],
-      [0, 1],
-      Extrapolation.CLAMP
-    );
-    return { opacity };
-  });
-
-  const swipeOpacityStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      scrollX.value,
-      [lastSlideStart - width * 0.3, lastSlideStart],
-      [1, 0],
-      Extrapolation.CLAMP
-    );
-    return { opacity };
-  });
-
   const handlePressIn = () => {
     buttonScale.value = withSpring(0.95, { damping: 15, stiffness: 400 });
   };
@@ -308,9 +299,17 @@ const OnboardingScreen = () => {
           entering={FadeIn.delay(300).duration(600)}
           style={styles.header}
         >
-          <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
+          <View style={styles.headerLeftControls}>
+            <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
+
+            {__DEV__ && (
+              <TouchableOpacity onPress={handleDevResetOnboarding} style={styles.devResetButton}>
+                <Text style={styles.devResetText}>DEV: Reset onboarding</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Smooth Progress Bar */}
           <View style={styles.progressContainer}>
@@ -330,9 +329,19 @@ const OnboardingScreen = () => {
           onScroll={onScroll}
           scrollEventThrottle={16}
           decelerationRate="fast"
-          snapToInterval={width}
-          snapToAlignment="start"
+          scrollEnabled={false}
           bounces={false}
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
+          onScrollToIndexFailed={(info) => {
+            flatListRef.current?.scrollToOffset({
+              offset: info.index * width,
+              animated: true,
+            });
+          }}
           style={{ flex: 1 }}
         />
 
@@ -348,27 +357,18 @@ const OnboardingScreen = () => {
             ))}
           </View>
 
-          {/* Button and Swipe indicator with crossfade based on scroll */}
+          {/* Primary action button */}
           <View style={styles.footerButtonContainer}>
-            {/* Swipe Indicator - fades out on last slide */}
-            <Animated.View style={[styles.swipeIndicator, styles.absoluteFill, swipeOpacityStyle]}>
-              <Text style={styles.swipeText}>Swipe to continue</Text>
-              <Text style={styles.swipeArrow}>→</Text>
-            </Animated.View>
-
-            {/* Get Started Button - fades in on last slide */}
-            <Animated.View style={[styles.absoluteFill, buttonOpacityStyle]}>
-              <TouchableOpacity
-                onPress={handleGetStarted}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                activeOpacity={1}
-              >
-                <Animated.View style={[styles.button, buttonStyle]}>
-                  <Text style={styles.buttonText}>Get Started</Text>
-                </Animated.View>
-              </TouchableOpacity>
-            </Animated.View>
+            <TouchableOpacity
+              onPress={handleNext}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              activeOpacity={1}
+            >
+              <Animated.View style={[styles.button, buttonStyle]}>
+                <Text style={styles.buttonText}>{isLastSlide ? 'Get Started' : 'Next'}</Text>
+              </Animated.View>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </View>
@@ -392,9 +392,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 20,
   },
+  headerLeftControls: {
+    alignItems: 'flex-start',
+    gap: 6,
+  },
   skipButton: {
     paddingVertical: 8,
     paddingHorizontal: 4,
+  },
+  devResetButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  devResetText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.55)',
+    letterSpacing: 0.2,
   },
   skipText: {
     fontSize: 15,
@@ -475,33 +489,8 @@ const styles = StyleSheet.create({
     color: '#0A0A0A',
     letterSpacing: 0.3,
   },
-  swipeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 8,
-  },
-  swipeText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.4)',
-    letterSpacing: 0.3,
-  },
-  swipeArrow: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.4)',
-  },
   footerButtonContainer: {
-    height: 56,
-    position: 'relative',
-  },
-  absoluteFill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    minHeight: 56,
   },
 });
 

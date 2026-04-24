@@ -113,7 +113,7 @@ const ThemedApp = () => {
   useEffect(() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const engine = (global as any).HermesInternal ? 'Hermes' : 'JSC';
+      const engine = (globalThis as any).HermesInternal ? 'Hermes' : 'JSC';
       console.log('JS Engine:', engine);
     } catch { }
   }, []);
@@ -235,6 +235,38 @@ const ThemedApp = () => {
 
   // Navigation reference
   const navigationRef = React.useRef<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      return;
+    }
+
+    const electronBridge = (globalThis as any)?.electron;
+    if (!electronBridge || typeof electronBridge.onResetOnboarding !== 'function') {
+      return;
+    }
+
+    const unsubscribe = electronBridge.onResetOnboarding(async () => {
+      try {
+        await mmkvStorage.removeItem('hasCompletedOnboarding');
+        await mmkvStorage.removeItem('showLoginHintToastOnce');
+      } catch (error) {
+        console.error('Failed to reset onboarding from desktop menu:', error);
+      }
+
+      setHasCompletedOnboarding(false);
+      navigationRef.current?.resetRoot?.({
+        index: 0,
+        routes: [{ name: 'Onboarding' }],
+      });
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, []);
 
   // Don't render anything until we know the onboarding status
   const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;

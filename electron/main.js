@@ -129,6 +129,19 @@ const template = [
       { role: 'togglefullscreen' },
     ],
   },
+  {
+    label: 'Tools',
+    submenu: [
+      {
+        label: 'Reset Onboarding',
+        click: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('app:reset-onboarding');
+          }
+        },
+      },
+    ],
+  },
 ];
 
 const menu = Menu.buildFromTemplate(template);
